@@ -235,3 +235,31 @@ export interface UnlockedVideoSession {
   unlockedAt?: number;
   expiresAt?: number; // timestamp in ms (90 min from unlockedAt)
 }
+
+export interface ChannelPublisherPost {
+  id: string;
+  targetChannel: string;
+  title: string;
+  description: string;
+  thumbnail: string;
+  demoUrl: string;
+  fullVideoUrl: string;
+  tutorialUrl: string;
+  messageId?: number;
+  postUrl?: string;
+  publishedAt: string;
+  status: 'published' | 'failed' | 'deleted';
+}
+
+export interface ScheduledDeletionItem {
+  id: string;
+  chatId: string;
+  messageId: number;
+  deleteAt: number;
+  scheduledAt: number;
+  videoTitle: string;
+  postUrl?: string;
+  botToken?: string;
+  status: 'pending' | 'deleted' | 'failed';
+  error?: string;
+}

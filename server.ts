@@ -333,48 +333,103 @@ if (!fs.existsSync(path.join(DATA_DIR, "packages.json"))) {
   saveJsonFile("packages.json", serverPackages);
 }
 
+// Channel Posts Published via Channel Post Publisher
+let serverChannelPosts: any[] = loadJsonFile("channel_posts.json", []);
+if (!fs.existsSync(path.join(DATA_DIR, "channel_posts.json"))) {
+  saveJsonFile("channel_posts.json", serverChannelPosts);
+}
+
 // Scheduled Telegram Video Auto-Deletions (90-Minute Expiry)
 interface ScheduledVideoDeletion {
+  id: string;
   chatId: string;
   messageId: number;
   deleteAt: number;
+  scheduledAt: number;
   videoTitle: string;
+  postUrl?: string;
+  botToken?: string;
+  status: 'pending' | 'deleted' | 'failed';
+  error?: string;
 }
 let scheduledDeletions: ScheduledVideoDeletion[] = loadJsonFile("scheduled_deletions.json", []);
+
+async function executeTelegramDeleteMessage(chatId: string, messageId: number, customToken?: string): Promise<{ success: boolean; error?: string }> {
+  const token = customToken || telegramConfig.botToken || process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return { success: false, error: "No bot token configured" };
+
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, message_id: messageId }),
+    });
+    const data: any = await res.json();
+    if (data.ok) {
+      return { success: true };
+    }
+
+    // If chat_id was @demovideos24 and it failed, try numeric ID -1004305683246
+    if (chatId === "@demovideos24" || chatId === "demovideos24") {
+      const fallbackRes = await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: "-1004305683246", message_id: messageId }),
+      });
+      const fallbackData: any = await fallbackRes.json();
+      if (fallbackData.ok) {
+        return { success: true };
+      }
+    }
+
+    // If message is already deleted or not found, consider it deleted
+    if (data.description && (data.description.includes("message to delete not found") || data.description.includes("message can't be deleted"))) {
+      return { success: true, error: data.description };
+    }
+
+    return { success: false, error: data.description || "Telegram delete failed" };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
 
 async function cleanupExpiredTelegramVideos() {
   const token = telegramConfig.botToken || process.env.TELEGRAM_BOT_TOKEN;
   if (!token || scheduledDeletions.length === 0) return;
 
   const now = Date.now();
-  const remaining: ScheduledVideoDeletion[] = [];
+  let modified = false;
 
   for (const item of scheduledDeletions) {
+    if (item.status === 'deleted') continue;
+
     if (item.deleteAt <= now) {
-      try {
-        console.log(`[AutoDelete] Deleting expired video message ${item.messageId} from channel ${item.chatId} ("${item.videoTitle}")`);
-        await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chat_id: item.chatId, message_id: item.messageId }),
-        });
-      } catch (err: any) {
-        console.warn(`[AutoDelete] Failed to delete message ${item.messageId}:`, err.message);
+      console.log(`[AutoDelete] Deleting expired video message ${item.messageId} from channel ${item.chatId} ("${item.videoTitle}")`);
+      const delResult = await executeTelegramDeleteMessage(item.chatId, item.messageId, item.botToken || token);
+      if (delResult.success) {
+        item.status = 'deleted';
+        modified = true;
+      } else {
+        item.status = 'failed';
+        item.error = delResult.error;
+        modified = true;
       }
-    } else {
-      remaining.push(item);
     }
   }
 
-  if (remaining.length !== scheduledDeletions.length) {
-    scheduledDeletions = remaining;
+  // Keep records for 24h for audit/logging in admin UI
+  const oneDayAgo = now - 24 * 60 * 60 * 1000;
+  const filtered = scheduledDeletions.filter(item => (item.scheduledAt && item.scheduledAt > oneDayAgo) || item.status === 'pending');
+  if (filtered.length !== scheduledDeletions.length || modified) {
+    scheduledDeletions = filtered;
     saveJsonFile("scheduled_deletions.json", scheduledDeletions);
   }
 }
 
-// Check every 60 seconds
-setInterval(cleanupExpiredTelegramVideos, 60 * 1000);
-setTimeout(cleanupExpiredTelegramVideos, 5000);
+// Check every 30 seconds for expired video deletion
+setInterval(cleanupExpiredTelegramVideos, 30 * 1000);
+setTimeout(cleanupExpiredTelegramVideos, 3000);
+
 
 let serverOrders = loadJsonFile("orders.json", [...INITIAL_PACKAGE_ORDERS]);
 if (!fs.existsSync(path.join(DATA_DIR, "orders.json"))) {
@@ -1991,12 +2046,18 @@ async function startServer() {
       : `https://t.me/${cleanTarget}`;
 
     // Schedule auto-deletion in 90 minutes
-    scheduledDeletions.push({
+    const schedItem: ScheduledVideoDeletion = {
+      id: "del_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7),
       chatId: targetChat,
       messageId: uploadedMsgId,
       deleteAt,
+      scheduledAt: now,
       videoTitle: video.title,
-    });
+      postUrl,
+      botToken,
+      status: 'pending',
+    };
+    scheduledDeletions.unshift(schedItem);
     saveJsonFile("scheduled_deletions.json", scheduledDeletions);
 
     // Update Session
@@ -2190,6 +2251,232 @@ async function startServer() {
     }
 
     res.json({ success: true, allVideos: serverAdLockedVideos });
+  });
+
+  // ==========================================
+  // CHANNEL POST PUBLISHER APIS
+  // ==========================================
+
+  function escapeTgHtml(text: string): string {
+    if (!text) return "";
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  // Admin: Get published channel posts
+  app.get("/api/admin/channel-publisher/posts", (_req, res) => {
+    res.json({ success: true, posts: serverChannelPosts });
+  });
+
+  // Admin: Publish new post to Telegram channel with 3 inline buttons
+  app.post("/api/admin/channel-publisher/publish", async (req, res) => {
+    const {
+      targetChannel = "@demovideos24",
+      thumbnail,
+      title,
+      description,
+      demoUrl,
+      fullVideoUrl,
+      tutorialUrl,
+      botToken: customToken,
+    } = req.body;
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: "পোস্টের টাইটেল (Title) দেওয়া আবশ্যক।" });
+    }
+
+    const botToken = customToken || telegramConfig.botToken || process.env.TELEGRAM_BOT_TOKEN;
+    if (!botToken) {
+      return res.status(400).json({ error: "⚠️ টেলিগ্রাম বট টোকেন কনফিগার করা নেই। এডমিন প্যানেলে বট টোকেন সেভ করুন।" });
+    }
+
+    let targetChat = targetChannel ? targetChannel.trim() : "@demovideos24";
+    if (targetChat.startsWith("https://t.me/")) {
+      targetChat = "@" + targetChat.replace("https://t.me/", "").split("/")[0].replace("/", "");
+    }
+    if (!targetChat.startsWith("@") && !targetChat.startsWith("-")) {
+      targetChat = "@" + targetChat;
+    }
+
+    // Build 3 inline buttons as explicitly specified by the user:
+    // Button 1: “👀 Watch Demo”
+    // Button 2: “🚀 Watch Full Video (Watch Now)”
+    // Button 3: “💡 How to watch videos? (Tutorial)”
+    const buttons: any[] = [];
+    const validDemoUrl = (demoUrl && demoUrl.trim()) ? demoUrl.trim() : "https://t.me/demovideos24";
+    const validFullUrl = (fullVideoUrl && fullVideoUrl.trim()) ? fullVideoUrl.trim() : `https://t.me/${(telegramConfig.botUsername || "CholoIncomeKoriBot").replace("@", "")}`;
+    const validTutUrl = (tutorialUrl && tutorialUrl.trim()) ? tutorialUrl.trim() : "https://t.me/CholoIncomeKori";
+
+    buttons.push([{ text: "👀 Watch Demo", url: validDemoUrl }]);
+    buttons.push([{ text: "🚀 Watch Full Video (Watch Now)", url: validFullUrl }]);
+    buttons.push([{ text: "💡 How to watch videos? (Tutorial)", url: validTutUrl }]);
+
+    const inlineKeyboard = { inline_keyboard: buttons };
+
+    // Format HTML caption
+    const cleanTitle = title.trim();
+    const cleanDesc = (description || "").trim();
+    let caption = `🎬 <b>${escapeTgHtml(cleanTitle)}</b>\n\n`;
+    if (cleanDesc) {
+      caption += `${escapeTgHtml(cleanDesc)}\n\n`;
+    }
+    caption += `━━━━━━━━━━━━━━━━━━━━\n👇 <b>ভিডিওটি দেখতে নিচের বাটনগুলো ব্যবহার করুন:</b>`;
+
+    let publishedMsgId: number | null = null;
+    let tgErrorMsg = "";
+
+    // 1. Try sending Photo if thumbnail provided
+    if (thumbnail && thumbnail.trim()) {
+      try {
+        console.log(`[ChannelPublisher] Sending photo to ${targetChat} with 3 inline buttons`);
+        const photoRes = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: targetChat,
+            photo: thumbnail.trim(),
+            caption,
+            parse_mode: "HTML",
+            reply_markup: inlineKeyboard,
+          }),
+        });
+        const photoData: any = await photoRes.json();
+        if (photoData.ok && photoData.result?.message_id) {
+          publishedMsgId = photoData.result.message_id;
+        } else {
+          tgErrorMsg = photoData.description || "Photo send failed";
+          console.warn("[ChannelPublisher] sendPhoto error:", tgErrorMsg);
+        }
+      } catch (err: any) {
+        tgErrorMsg = err.message;
+        console.warn("[ChannelPublisher] sendPhoto exception:", err.message);
+      }
+    }
+
+    // 2. Fallback to sendMessage if photo not provided or failed
+    if (!publishedMsgId) {
+      try {
+        console.log(`[ChannelPublisher] Sending text message fallback to ${targetChat}`);
+        const msgRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: targetChat,
+            text: caption,
+            parse_mode: "HTML",
+            reply_markup: inlineKeyboard,
+          }),
+        });
+        const msgData: any = await msgRes.json();
+        if (msgData.ok && msgData.result?.message_id) {
+          publishedMsgId = msgData.result.message_id;
+        } else {
+          tgErrorMsg = msgData.description || tgErrorMsg;
+        }
+      } catch (err: any) {
+        tgErrorMsg = err.message;
+      }
+    }
+
+    if (!publishedMsgId) {
+      return res.status(500).json({
+        error: `টেলিগ্রাম চ্যানেলে পোস্ট পাঠাতে ব্যর্থ: ${tgErrorMsg || "বটকে চ্যানেলে এডমিন করা আছে কিনা যাচাই করুন।"}`
+      });
+    }
+
+    const cleanTarget = targetChat.replace("@", "");
+    const postUrl = targetChat.startsWith("@")
+      ? `https://t.me/${cleanTarget}/${publishedMsgId}`
+      : `https://t.me/${cleanTarget}`;
+
+    const newPost = {
+      id: "pub_" + Date.now(),
+      targetChannel: targetChat,
+      title: cleanTitle,
+      description: cleanDesc,
+      thumbnail: thumbnail || "",
+      demoUrl: validDemoUrl,
+      fullVideoUrl: validFullUrl,
+      tutorialUrl: validTutUrl,
+      messageId: publishedMsgId,
+      postUrl,
+      publishedAt: new Date().toISOString(),
+      status: "published",
+    };
+
+    serverChannelPosts.unshift(newPost);
+    saveJsonFile("channel_posts.json", serverChannelPosts);
+
+    return res.json({
+      success: true,
+      message: `🎉 পোস্টটি সফলভাবে '${targetChat}' চ্যানেলে ৩টি বাটনসহ পাবলিশ করা হয়েছে!`,
+      postUrl,
+      messageId: publishedMsgId,
+      post: newPost,
+      allPosts: serverChannelPosts,
+    });
+  });
+
+  // Admin: Delete published post from Telegram channel
+  app.post("/api/admin/channel-publisher/delete-post", async (req, res) => {
+    const { id } = req.body;
+    const post = serverChannelPosts.find((p) => p.id === id);
+    if (!post) {
+      return res.status(404).json({ error: "পোস্টটি পাওয়া যায়নি।" });
+    }
+
+    if (post.messageId && post.targetChannel) {
+      const delRes = await executeTelegramDeleteMessage(post.targetChannel, post.messageId);
+      if (!delRes.success && delRes.error && !delRes.error.includes("not found")) {
+        console.warn("[ChannelPublisher] Failed to delete from channel:", delRes.error);
+      }
+    }
+
+    post.status = "deleted";
+    serverChannelPosts = serverChannelPosts.filter((p) => p.id !== id);
+    saveJsonFile("channel_posts.json", serverChannelPosts);
+
+    return res.json({ success: true, message: "পোস্টটি চ্যানেল ও তালিকা থেকে মুছে ফেলা হয়েছে।", allPosts: serverChannelPosts });
+  });
+
+  // Admin: Get Scheduled Deletions queue (90-Min Auto Delete Monitor)
+  app.get("/api/admin/scheduled-deletions", (_req, res) => {
+    const now = Date.now();
+    const enriched = scheduledDeletions.map((item) => {
+      const remainingSeconds = Math.max(0, Math.floor((item.deleteAt - now) / 1000));
+      return {
+        ...item,
+        remainingSeconds,
+        isExpired: item.deleteAt <= now,
+      };
+    });
+    res.json({ success: true, queue: enriched });
+  });
+
+  // Admin: Immediate Delete Now for a scheduled video (instant testing & manual delete)
+  app.post("/api/admin/scheduled-deletions/delete-now", async (req, res) => {
+    const { id, messageId, chatId } = req.body;
+    const item = scheduledDeletions.find((s) => s.id === id || (s.messageId === Number(messageId) && s.chatId === chatId));
+
+    const targetChat = item ? item.chatId : chatId;
+    const targetMsgId = item ? item.messageId : Number(messageId);
+
+    if (!targetChat || !targetMsgId) {
+      return res.status(400).json({ error: "Chat ID এবং Message ID দেওয়া আবশ্যক।" });
+    }
+
+    const delRes = await executeTelegramDeleteMessage(targetChat, targetMsgId, item?.botToken);
+    if (delRes.success) {
+      if (item) {
+        item.status = "deleted";
+        saveJsonFile("scheduled_deletions.json", scheduledDeletions);
+      }
+      return res.json({ success: true, message: `✅ মেসেজ #${targetMsgId} সফলভাবে '${targetChat}' চ্যানেল থেকে মুছে ফেলা হয়েছে!` });
+    } else {
+      return res.status(500).json({ error: `ডিলিট ব্যর্থ: ${delRes.error || "অজ্ঞাত ত্রুটি"}` });
+    }
   });
 
   // ==========================================
