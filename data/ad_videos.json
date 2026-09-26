@@ -15,10 +15,10 @@
     "expiryMinutes": 90,
     "protectContent": true,
     "deliveryBotHandle": "PremiumVideoDeliveryBot",
-    "demoChannelUrl": "",
-    "channelId": "https://t.me/demovideos24",
+    "demoChannelUrl": "https://t.me/demovideos24",
+    "channelId": "@demovideos24",
     "views": 0,
-    "unlockedCount": 0
+    "unlockedCount": 1
   },
   {
     "id": "lock-vid-1",

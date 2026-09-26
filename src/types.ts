@@ -168,6 +168,9 @@ export interface AdLockedVideo {
   adsWatched?: number;
   unlocked?: boolean;
   isUnlocked?: boolean;
+  delivered?: boolean;
+  channelPostUrl?: string;
+  canSendInbox?: boolean;
   expiresAt?: number;
   remainingSeconds?: number;
   duration?: string;

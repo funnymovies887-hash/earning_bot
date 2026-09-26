@@ -315,7 +315,13 @@ let userVideoSessions: Record<string, {
   unlocked: boolean;
   unlockedAt?: number;
   expiresAt?: number;
-}> = {};
+  delivered?: boolean;
+  channelPostUrl?: string;
+  canSendInbox?: boolean;
+}> = loadJsonFile("user_video_sessions.json", {});
+if (!fs.existsSync(path.join(DATA_DIR, "user_video_sessions.json"))) {
+  saveJsonFile("user_video_sessions.json", userVideoSessions);
+}
 
 // Digital Packages & Store Orders State with Disk Persistence
 let deletedPackageIds: string[] = loadJsonFile("deleted_package_ids.json", []);
@@ -1719,8 +1725,11 @@ async function startServer() {
         } else {
           // 90 minutes expired! Auto-relock
           session.unlocked = false;
+          session.delivered = false;
           session.adsWatched = 0;
           session.expiresAt = undefined;
+          session.channelPostUrl = undefined;
+          saveJsonFile("user_video_sessions.json", userVideoSessions);
         }
       }
 
@@ -1731,7 +1740,7 @@ async function startServer() {
         previewDuration: video.previewDuration,
         fullDuration: video.fullDuration,
         previewVideoUrl: video.previewVideoUrl,
-        fullVideoUrl: isUnlocked ? video.fullVideoUrl : null, // Hidden until 15 ads completed!
+        fullVideoUrl: isUnlocked ? video.fullVideoUrl : null,
         thumbnail: video.thumbnail,
         requiredAds: video.requiredAds,
         adTimerSeconds: video.adTimerSeconds || 15,
@@ -1739,13 +1748,18 @@ async function startServer() {
         adNetworkName: video.adNetworkName,
         expiryMinutes: video.expiryMinutes || 90,
         protectContent: video.protectContent ?? true,
-        deliveryBotHandle: video.deliveryBotHandle,
+        deliveryBotHandle: video.deliveryBotHandle || "PremiumVideoDeliveryBot",
+        demoChannelUrl: video.demoChannelUrl || "https://t.me/demovideos24",
+        channelId: video.channelId || "@demovideos24",
         views: video.views || 0,
         unlockedCount: video.unlockedCount || 0,
         unlocked: isUnlocked,
         adsWatched: session?.adsWatched || 0,
         remainingSeconds,
         expiresAt,
+        delivered: Boolean(session?.delivered && isUnlocked),
+        channelPostUrl: isUnlocked ? session?.channelPostUrl : null,
+        canSendInbox: Boolean(session && session.adsWatched >= video.requiredAds && !session?.delivered),
       };
     });
 
@@ -1776,14 +1790,15 @@ async function startServer() {
     const session = userVideoSessions[sessionKey];
     const now = Date.now();
 
-    // If already unlocked and still within 90 minutes
+    // If already delivered and still active within 90 minutes
     if (session.unlocked && session.expiresAt && session.expiresAt > now) {
       return res.json({
         success: true,
         unlocked: true,
+        delivered: Boolean(session.delivered),
+        channelPostUrl: session.channelPostUrl,
         adsWatched: session.adsWatched,
         requiredAds: video.requiredAds,
-        fullVideoUrl: video.fullVideoUrl,
         expiresAt: session.expiresAt,
         remainingSeconds: Math.floor((session.expiresAt - now) / 1000),
       });
@@ -1792,97 +1807,217 @@ async function startServer() {
     // Increment watched ads
     session.adsWatched = (session.adsWatched || 0) + 1;
 
-    // Check if user completed required ads (e.g. 15 ads)
+    // Check if user completed required ads
     if (session.adsWatched >= video.requiredAds) {
-      session.unlocked = true;
-      session.unlockedAt = now;
-      const expiryMs = (video.expiryMinutes || 90) * 60 * 1000;
-      session.expiresAt = now + expiryMs;
-      video.unlockedCount = (video.unlockedCount || 0) + 1;
-
-      // Automatically post/upload full video to Telegram Channel for 90 minutes
-      const botToken = telegramConfig.botToken || process.env.TELEGRAM_BOT_TOKEN;
-      const targetChat = video.channelId || telegramConfig.channel1Handle || telegramConfig.channel2Handle;
-      let tgUploaded = false;
-      let tgMsgText = "";
-
-      if (botToken && targetChat) {
-        (async () => {
-          try {
-            const caption = `🎬 **${video.title}** (সম্পূর্ণ ফুল ভিডিও)\n\n⏱️ **এই ভিডিওটি আগামী ৯০ মিনিটের জন্য চ্যানেলে থাকবে এবং ৯০ মিনিট পর স্বয়ংক্রিয়ভাবে মুছে যাবে!**\n\n🛡️ *ডাউনলোড ও ফরওয়ার্ডিং নিষিদ্ধ (Protected Content)*`;
-            let uploadRes;
-
-            // Try sending as video first with protect_content: true
-            if (video.fullVideoUrl && !video.fullVideoUrl.includes('youtube') && !video.fullVideoUrl.includes('drive.google')) {
-              uploadRes = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  chat_id: targetChat,
-                  video: video.fullVideoUrl,
-                  caption,
-                  parse_mode: "Markdown",
-                  protect_content: true, // Native Telegram DRM protection!
-                  supports_streaming: true,
-                }),
-              });
-            }
-
-            if (!uploadRes || !uploadRes.ok) {
-              // Fallback to sending protected message with direct private link
-              uploadRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  chat_id: targetChat,
-                  text: `${caption}\n\n🔗 ফুল ভিডিও লিংক: ${video.fullVideoUrl}`,
-                  parse_mode: "Markdown",
-                  protect_content: true,
-                }),
-              });
-            }
-
-            const uploadData: any = await uploadRes.json();
-            if (uploadData.ok && uploadData.result?.message_id) {
-              const msgId = uploadData.result.message_id;
-              console.log(`[Telegram AutoUpload] Full video posted to ${targetChat}, msgId: ${msgId}. Scheduling deletion in 90m.`);
-              scheduledDeletions.push({
-                chatId: targetChat,
-                messageId: msgId,
-                deleteAt: now + expiryMs,
-                videoTitle: video.title,
-              });
-              saveJsonFile("scheduled_deletions.json", scheduledDeletions);
-            }
-          } catch (e: any) {
-            console.warn("[Telegram AutoUpload] Failed:", e.message);
-          }
-        })().catch(() => {});
-      }
-
-      saveJsonFile("ad_videos.json", serverAdLockedVideos);
+      session.canSendInbox = true;
+      saveJsonFile("user_video_sessions.json", userVideoSessions);
 
       return res.json({
         success: true,
-        justUnlocked: true,
-        unlocked: true,
+        canSendInbox: true,
+        justCompletedAds: true,
         adsWatched: session.adsWatched,
         requiredAds: video.requiredAds,
-        fullVideoUrl: video.fullVideoUrl,
-        expiresAt: session.expiresAt,
-        remainingSeconds: Math.floor(expiryMs / 1000),
-        message: `🎉 অভিনন্দন! ${video.requiredAds}টি অ্যাড সম্পন্ন হয়েছে। সম্পূর্ণ ভিডিওটি পরবর্তী ৯০ মিনিটের জন্য আনলক করা হয়েছে এবং চ্যানেলে ৯০ মিনিটের জন্য অটো-আপলোড হয়েছে!`,
+        remainingAds: 0,
+        message: `🎉 অভিনন্দন! প্রয়োজনীয় ${video.requiredAds}টি বিজ্ঞাপন দেখা সম্পন্ন হয়েছে! এবার সম্পূর্ণ ফুল ভিডিওটি টেলিগ্রাম চ্যানেলে পেতে 'Send Inbox' বাটনে ক্লিক করুন।`,
       });
     }
 
+    saveJsonFile("user_video_sessions.json", userVideoSessions);
+
     res.json({
       success: true,
-      justUnlocked: false,
-      unlocked: false,
+      canSendInbox: false,
+      justCompletedAds: false,
       adsWatched: session.adsWatched,
       requiredAds: video.requiredAds,
       remainingAds: video.requiredAds - session.adsWatched,
-      message: `অ্যাড সম্পন্ন হয়েছে! বাকি আছে ${video.requiredAds - session.adsWatched}টি অ্যাড।`,
+      message: `বিজ্ঞাপন সম্পন্ন হয়েছে! বাকি আছে ${video.requiredAds - session.adsWatched}টি বিজ্ঞাপন।`,
+    });
+  });
+
+  // User clicks "Send Inbox": Bot uploads/copies full video to demo video channel with protect_content & 90m auto-delete
+  app.post("/api/ad-videos/send-inbox", async (req, res) => {
+    const user = getRequestUser(req);
+    const { videoId } = req.body;
+    const userId = req.body.userId || user.id;
+
+    const video = serverAdLockedVideos.find((v) => v.id === videoId);
+    if (!video) {
+      return res.status(404).json({ error: "ভিডিওটি পাওয়া যায়নি।" });
+    }
+
+    const sessionKey = `${userId}_${videoId}`;
+    const session = userVideoSessions[sessionKey];
+
+    if (!session || (session.adsWatched < video.requiredAds && !(telegramConfig as any).allowDevBypass)) {
+      return res.status(400).json({ error: `প্রথমে প্রয়োজনীয় ${video.requiredAds}টি স্পন্সর বিজ্ঞাপন দেখা সম্পন্ন করতে হবে।` });
+    }
+
+    const now = Date.now();
+    // If already uploaded and still active
+    if (session.delivered && session.expiresAt && session.expiresAt > now && session.channelPostUrl) {
+      return res.json({
+        success: true,
+        delivered: true,
+        postUrl: session.channelPostUrl,
+        expiresAt: session.expiresAt,
+        remainingSeconds: Math.floor((session.expiresAt - now) / 1000),
+        message: "ফুল ভিডিওটি ইতিমধ্যে চ্যানেলে আপলোড করা হয়েছে!",
+      });
+    }
+
+    const botToken = telegramConfig.botToken || process.env.TELEGRAM_BOT_TOKEN;
+    if (!botToken) {
+      return res.status(400).json({ error: "⚠️ কোনো Telegram Bot Token সেট করা নেই। এডমিন প্যানেলে বট টোকেন সেভ করুন।" });
+    }
+
+    // Target Channel: user explicitly specified demo video channel: @demovideos24
+    let targetChat = video.channelId ? video.channelId.trim() : "@demovideos24";
+    if (targetChat.startsWith("https://t.me/")) {
+      targetChat = "@" + targetChat.replace("https://t.me/", "").split("/")[0].replace("/", "");
+    }
+    if (!targetChat.startsWith("@") && !targetChat.startsWith("-")) {
+      targetChat = "@" + targetChat;
+    }
+
+    const caption = `🎬 **${video.title}** (সম্পূর্ণ ফুল ভিডিও)\n\n⏱️ **এই ভিডিওটি আগামী ৯০ মিনিটের জন্য চ্যানেলে থাকবে এবং ৯০ মিনিট পর স্বয়ংক্রিয়ভাবে মুছে যাবে!**\n\n🛡️ *ডাউনলোড ও ফরওয়ার্ডিং নিষিদ্ধ (Protected Content)*`;
+
+    let uploadedMsgId: number | null = null;
+    let tgErrorMsg = "";
+
+    // 1. Try copyMessage if fullVideoUrl is a Telegram post (e.g. https://t.me/premiumvideounlocked/3)
+    const tgMatch = video.fullVideoUrl?.match(/t\.me\/(?:c\/)?([^\/\?#]+)\/(\d+)/);
+
+    if (tgMatch) {
+      const rawChannel = tgMatch[1];
+      const sourceMsgId = parseInt(tgMatch[2], 10);
+      const fromChat = rawChannel.startsWith("-") || rawChannel.startsWith("@") ? rawChannel : "@" + rawChannel;
+
+      try {
+        console.log(`[SendInbox] Copying post #${sourceMsgId} from ${fromChat} to ${targetChat} with protect_content: true`);
+        const copyRes = await fetch(`https://api.telegram.org/bot${botToken}/copyMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: targetChat,
+            from_chat_id: fromChat,
+            message_id: sourceMsgId,
+            caption,
+            parse_mode: "Markdown",
+            protect_content: true, // Telegram native DRM: disables download, saving, and forwarding!
+          }),
+        });
+
+        const copyData: any = await copyRes.json();
+        if (copyData.ok && copyData.result?.message_id) {
+          uploadedMsgId = copyData.result.message_id;
+          console.log(`[SendInbox] copyMessage succeeded! Target: ${targetChat}, msgId: ${uploadedMsgId}`);
+        } else {
+          tgErrorMsg = copyData.description || "Copy message failed";
+          console.warn("[SendInbox] copyMessage failed:", tgErrorMsg);
+        }
+      } catch (e: any) {
+        tgErrorMsg = e.message;
+        console.warn("[SendInbox] copyMessage error:", e.message);
+      }
+    }
+
+    // 2. Direct Video Send fallback if not copied and is a video url
+    if (!uploadedMsgId && video.fullVideoUrl && !video.fullVideoUrl.includes("drive.google") && !video.fullVideoUrl.includes("youtube")) {
+      try {
+        console.log(`[SendInbox] sendVideo to ${targetChat} with protect_content: true`);
+        const vidRes = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: targetChat,
+            video: video.fullVideoUrl,
+            caption,
+            parse_mode: "Markdown",
+            protect_content: true,
+            supports_streaming: true,
+          }),
+        });
+        const vidData: any = await vidRes.json();
+        if (vidData.ok && vidData.result?.message_id) {
+          uploadedMsgId = vidData.result.message_id;
+        } else {
+          tgErrorMsg = vidData.description || tgErrorMsg;
+        }
+      } catch (e: any) {
+        console.warn("[SendInbox] sendVideo fallback error:", e.message);
+      }
+    }
+
+    // 3. Protected Message fallback
+    if (!uploadedMsgId) {
+      try {
+        const msgRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: targetChat,
+            text: `${caption}\n\n🔗 ফুল ভিডিও লিংক: ${video.fullVideoUrl}`,
+            parse_mode: "Markdown",
+            protect_content: true,
+          }),
+        });
+        const msgData: any = await msgRes.json();
+        if (msgData.ok && msgData.result?.message_id) {
+          uploadedMsgId = msgData.result.message_id;
+        } else {
+          tgErrorMsg = msgData.description || tgErrorMsg;
+        }
+      } catch (e: any) {
+        console.warn("[SendInbox] sendMessage fallback error:", e.message);
+      }
+    }
+
+    if (!uploadedMsgId) {
+      return res.status(500).json({
+        error: `চ্যানেলে ভিডিও পোস্ট পাঠাতে টেলিগ্রাম ত্রুটি: ${tgErrorMsg || "বটকে চ্যানেলে এডমিন করা আছে কিনা যাচাই করুন।"}`,
+      });
+    }
+
+    const expiryMs = (video.expiryMinutes || 90) * 60 * 1000;
+    const deleteAt = now + expiryMs;
+    const cleanTarget = targetChat.replace("@", "");
+    const postUrl = targetChat.startsWith("@")
+      ? `https://t.me/${cleanTarget}/${uploadedMsgId}`
+      : `https://t.me/${cleanTarget}`;
+
+    // Schedule auto-deletion in 90 minutes
+    scheduledDeletions.push({
+      chatId: targetChat,
+      messageId: uploadedMsgId,
+      deleteAt,
+      videoTitle: video.title,
+    });
+    saveJsonFile("scheduled_deletions.json", scheduledDeletions);
+
+    // Update Session
+    session.unlocked = true;
+    session.delivered = true;
+    session.channelPostUrl = postUrl;
+    session.unlockedAt = now;
+    session.expiresAt = deleteAt;
+    userVideoSessions[sessionKey] = session;
+    saveJsonFile("user_video_sessions.json", userVideoSessions);
+
+    // Increment count & save
+    video.unlockedCount = (video.unlockedCount || 0) + 1;
+    saveJsonFile("ad_videos.json", serverAdLockedVideos);
+
+    return res.json({
+      success: true,
+      delivered: true,
+      postUrl,
+      channelId: targetChat,
+      messageId: uploadedMsgId,
+      expiresAt: deleteAt,
+      remainingSeconds: Math.floor(expiryMs / 1000),
+      message: `🎉 অভিনন্দন! সম্পূর্ণ ফুল ভিডিওটি সফলভাবে ${targetChat} চ্যানেলে আপলোড হয়েছে! আগামী ৯০ মিনিট পর এটি স্বয়ংক্রিয়ভাবে মুছে যাবে এবং এটি ডাউনলোড বা ফরওয়ার্ড করা যাবে না।`,
     });
   });
 

@@ -55,17 +55,17 @@ export const AdminAdLockedVideosTab: React.FC = () => {
     setDescription('');
     setPreviewDuration('02:00');
     setFullDuration('18:40');
-    setPreviewVideoUrl('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4');
-    setFullVideoUrl('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
+    setPreviewVideoUrl('https://t.me/demovideos24/3');
+    setFullVideoUrl('https://t.me/premiumvideounlocked/3');
     setThumbnail('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=70');
-    setRequiredAds(15);
+    setRequiredAds(1);
     setAdTimerSeconds(15);
-    setAdNetworkUrl('https://monetag.com');
+    setAdNetworkUrl('https://omg10.com/4/11882677');
     setAdNetworkName('Monetag Direct Link');
     setExpiryMinutes(90);
     setDeliveryBotHandle('PremiumVideoDeliveryBot');
-    setDemoChannelUrl('');
-    setChannelId('');
+    setDemoChannelUrl('https://t.me/demovideos24');
+    setChannelId('@demovideos24');
     setStatusMsg(null);
     setIsVideoSaved(false);
   };
@@ -554,6 +554,18 @@ export const AdminAdLockedVideosTab: React.FC = () => {
               </button>
             </div>
 
+            {/* Step by Step Setup Guide Banner */}
+            <div className="bg-purple-950/70 border border-purple-500/50 rounded-2xl p-3.5 space-y-2 text-[11px]">
+              <span className="font-extrabold text-amber-300 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" /> যেভাবে ডেমো ও ফুল ভিডিও সেট করবেন:
+              </span>
+              <ul className="list-disc pl-4 space-y-1 text-slate-300">
+                <li><strong className="text-white">ডেমো চ্যানেল:</strong> <code className="text-purple-300 font-mono">https://t.me/demovideos24</code> (এখানে ডেমো ভিডিওটি থাকবে)</li>
+                <li><strong className="text-white">ফুল ভিডিও চ্যানেল:</strong> <code className="text-purple-300 font-mono">https://t.me/premiumvideounlocked</code> (এখানে ফুল ভিডিও আপলোড করে পোস্ট লিংক দিন)</li>
+                <li>ইউজার মিনি অ্যাপে প্রয়োজনীয় এডস দেখা শেষ করার পর <strong className="text-emerald-400">"Send Inbox"</strong> বাটনে চাপ দিলে বট স্বয়ংক্রিয়ভাবে ফুল ভিডিওটি <strong className="text-purple-300">@demovideos24</strong> চ্যানেলে Protect Content সহ আপলোড করবে এবং ৯০ মিনিট পর অটোমেটিক ডিলিট করে দেবে।</li>
+              </ul>
+            </div>
+
             <form onSubmit={handleCreate} className="space-y-3.5 text-xs">
               <div>
                 <label className="font-bold text-slate-200 block mb-0.5">১. ভিডিওর শিরোনাম (Title):</label>
@@ -616,7 +628,7 @@ export const AdminAdLockedVideosTab: React.FC = () => {
                     onChange={(e) => setRequiredAds(Number(e.target.value))}
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white font-bold text-amber-300 focus:outline-none focus:border-purple-500 font-mono"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">💡 ১৫টি অ্যাড দেখতে হবে।</p>
+                  <p className="text-[10px] text-slate-400 mt-1">💡 কতটি অ্যাড দেখতে হবে (যেমন: ১টি)।</p>
                 </div>
                 <div>
                   <label className="font-bold text-slate-200 block mb-0.5">৬. প্রতি অ্যাড সময়:</label>
@@ -650,7 +662,7 @@ export const AdminAdLockedVideosTab: React.FC = () => {
                 <input
                   type="url"
                   required
-                  placeholder="https://www.profitablecpmrate.com/your-adsterra-direct-link"
+                  placeholder="https://omg10.com/4/11882677 বা Adsterra/Monetag Direct Link"
                   value={adNetworkUrl}
                   onChange={(e) => setAdNetworkUrl(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono"
@@ -659,29 +671,29 @@ export const AdminAdLockedVideosTab: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-bold text-slate-200 block mb-0.5">৯. ২ মিনিটের ডেমো ভিডিও লিংক (Preview Video URL):</label>
+                <label className="font-bold text-slate-200 block mb-0.5">৯. ডেমো ভিডিও টেলিগ্রাম লিংক (Preview Video URL):</label>
                 <input
                   type="url"
                   required
-                  placeholder="https://domain.com/demo.mp4 বা সরাসরি ভিডিও ফাইল লিংক"
+                  placeholder="https://t.me/demovideos24/3"
                   value={previewVideoUrl}
                   onChange={(e) => setPreviewVideoUrl(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono"
                 />
-                <p className="text-[10px] text-slate-400 mt-1">💡 ১-২ মিনিটের ফ্রি ডেমো বা ট্রেলার ভিডিওর সরাসরি MP4 লিংক।</p>
+                <p className="text-[10px] text-slate-400 mt-1">💡 ডেমো ভিডিওর টেলিগ্রাম চ্যানেল পোস্ট লিংক (যেমন: https://t.me/demovideos24/3)। ইউজার "Watch Demo in Inbox" বাটনে চাপলে সরাসরি এই চ্যানেলে যাবে।</p>
               </div>
 
               <div>
-                <label className="font-bold text-slate-200 block mb-0.5">১০. সম্পূর্ণ ফুল ভিডিও লিংক (Full Video URL):</label>
+                <label className="font-bold text-slate-200 block mb-0.5">১০. সম্পূর্ণ ফুল ভিডিও টেলিগ্রাম লিংক (Full Video URL):</label>
                 <input
                   type="url"
                   required
-                  placeholder="https://domain.com/full_masterclass.mp4"
+                  placeholder="https://t.me/premiumvideounlocked/3"
                   value={fullVideoUrl}
                   onChange={(e) => setFullVideoUrl(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono"
                 />
-                <p className="text-[10px] text-slate-400 mt-1">💡 মূল পুরো ভিডিওর লিংক, যা ইউজার ১৫টি অ্যাড শেষ করলে চ্যানেলে ৯০ মিনিটের জন্য আপলোড হবে।</p>
+                <p className="text-[10px] text-slate-400 mt-1">💡 ফুল ভিডিওর পোস্ট লিংক (যেমন: https://t.me/premiumvideounlocked/3)। ইউজার বিজ্ঞাপন শেষ করে 'Send Inbox' চাপলে বট এই ভিডিওটি @demovideos24 চ্যানেলে protect_content সহ আপলোড করবে।</p>
               </div>
 
               <div>
@@ -701,23 +713,23 @@ export const AdminAdLockedVideosTab: React.FC = () => {
                   <label className="font-bold text-slate-200 block mb-0.5">১২. টার্গেট টেলিগ্রাম চ্যানেল:</label>
                   <input
                     type="text"
-                    placeholder="@CholoIncomeKori বা -100..."
+                    placeholder="@demovideos24"
                     value={channelId}
                     onChange={(e) => setChannelId(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">💡 যে চ্যানেলে ফুল ভিডিও ৯০ মিনিটের জন্য আপলোড হবে।</p>
+                  <p className="text-[10px] text-slate-400 mt-1">💡 যে চ্যানেলে ফুল ভিডিও ৯০ মিনিটের জন্য আপলোড হবে (ডিফল্ট: @demovideos24)।</p>
                 </div>
                 <div>
-                  <label className="font-bold text-slate-200 block mb-0.5">১৩. ডেমো পোস্ট লিংক (ঐচ্ছিক):</label>
+                  <label className="font-bold text-slate-200 block mb-0.5">১৩. ডেমো চ্যানেল লিংক:</label>
                   <input
                     type="url"
-                    placeholder="https://t.me/CholoIncomeKori/123"
+                    placeholder="https://t.me/demovideos24"
                     value={demoChannelUrl}
                     onChange={(e) => setDemoChannelUrl(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">💡 খালি রাখতে পারেন! চ্যানেলে ডেমো পোস্ট বাটনে চাপলে অটো তৈরি হবে।</p>
+                  <p className="text-[10px] text-slate-400 mt-1">💡 ডেমো ভিডিওর চ্যানেল লিংক (ডিফল্ট: https://t.me/demovideos24)।</p>
                 </div>
               </div>
 
@@ -725,7 +737,7 @@ export const AdminAdLockedVideosTab: React.FC = () => {
                 <label className="font-bold text-slate-200 block mb-0.5">১৪. ডেলিভারি বট ইউজারনেম (ঐচ্ছিক):</label>
                 <input
                   type="text"
-                  placeholder="যেমন: CholoIncome_Bot"
+                  placeholder="যেমন: PremiumVideoDeliveryBot বা CholoIncomeKoriBot"
                   value={deliveryBotHandle}
                   onChange={(e) => setDeliveryBotHandle(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono"
@@ -926,7 +938,7 @@ export const AdminAdLockedVideosTab: React.FC = () => {
                   <label className="font-bold text-slate-300 block mb-1">টার্গেট চ্যানেল (৯০ মি. আপলোড):</label>
                   <input
                     type="text"
-                    placeholder="@CholoIncomeKori বা -100..."
+                    placeholder="@demovideos24"
                     value={editingVideo.channelId || ''}
                     onChange={(e) => setEditingVideo({ ...editingVideo, channelId: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
@@ -936,7 +948,7 @@ export const AdminAdLockedVideosTab: React.FC = () => {
                   <label className="font-bold text-slate-300 block mb-1">ডেমো পোস্ট লিংক (চ্যানেল):</label>
                   <input
                     type="url"
-                    placeholder="https://t.me/CholoIncomeKori/123"
+                    placeholder="https://t.me/demovideos24/3"
                     value={editingVideo.demoChannelUrl || ''}
                     onChange={(e) => setEditingVideo({ ...editingVideo, demoChannelUrl: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500 font-mono"

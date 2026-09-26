@@ -315,16 +315,16 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                 <div
                   key={lockedVid.id}
                   id={`ad-locked-card-${lockedVid.id}`}
-                  className={`p-3.5 rounded-2xl border transition-all shadow-sm flex flex-col justify-between gap-3 ${
+                  onClick={() => onOpenAdLockedVideo(lockedVid)}
+                  className={`p-3.5 rounded-2xl border transition-all shadow-sm flex flex-col justify-between gap-3 cursor-pointer ${
                     isUnlocked
                       ? 'bg-gradient-to-br from-emerald-950/20 via-white to-green-50/50 border-emerald-500/40 hover:border-emerald-500'
                       : 'bg-white border-purple-200/80 hover:border-purple-400 hover:shadow-md'
                   }`}
                 >
                   <div
-                    className="flex items-start gap-3 cursor-pointer group"
-                    onClick={openDemoOnTelegram}
-                    title="ক্লিক করে টেলিগ্রাম চ্যানেলে ডেমো ভিডিওটি দেখুন"
+                    className="flex items-start gap-3 group"
+                    title="ক্লিক করে ডেমো ও ফুল ভিডিও আনলক পপআপ দেখুন"
                   >
                     <div className="relative w-24 h-16 rounded-xl overflow-hidden bg-slate-900 shrink-0 border border-slate-200">
                       <img
@@ -334,7 +334,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                       />
                       <div className="absolute top-1 left-1 bg-black/85 backdrop-blur-xs text-white text-[8px] font-black px-1.5 py-0.5 rounded flex items-center gap-1">
                         <Play className="w-2 h-2 fill-white" />
-                        <span>টেলিগ্রাম ডেমো</span>
+                        <span>ডেমো ভিডিও</span>
                       </div>
                       <div className="absolute bottom-1 right-1 bg-black/80 text-amber-300 text-[8px] font-bold px-1 rounded font-mono">
                         {lockedVid.duration || lockedVid.previewDuration || '02:00'}
@@ -366,9 +366,12 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                   <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
                     <button
                       type="button"
-                      onClick={openDemoOnTelegram}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenAdLockedVideo(lockedVid);
+                      }}
                       className="px-2.5 py-1.5 rounded-xl text-[10px] font-bold bg-purple-100 hover:bg-purple-200 text-purple-800 flex items-center gap-1 transition-all cursor-pointer"
-                      title="টেলিগ্রাম চ্যানেলে ডেমো ভিডিও দেখুন"
+                      title="ডেমো ও আনলক পপআপ দেখুন"
                     >
                       <Play className="w-3 h-3 fill-purple-800" />
                       <span>🎥 ডেমো দেখুন</span>
@@ -376,7 +379,10 @@ export const HomeTab: React.FC<HomeTabProps> = ({
 
                     <button
                       type="button"
-                      onClick={() => onOpenAdLockedVideo(lockedVid)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenAdLockedVideo(lockedVid);
+                      }}
                       className={`px-3 py-1.5 rounded-xl text-[10px] font-black flex items-center gap-1 transition-all cursor-pointer shadow-xs ${
                         isUnlocked
                           ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
@@ -386,12 +392,12 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                       {isUnlocked ? (
                         <>
                           <Unlock className="w-3 h-3" />
-                          <span>ফুল ভিডিও প্লে</span>
+                          <span>ফুল ভিডিও দেখুন</span>
                         </>
                       ) : (
                         <>
                           <Lock className="w-3 h-3 text-white" />
-                          <span>ফুল ভিডিও আনলক</span>
+                          <span>ইনবক্সে আনলক</span>
                         </>
                       )}
                     </button>
@@ -490,11 +496,11 @@ export const HomeTab: React.FC<HomeTabProps> = ({
               id={`video-card-${video.id}`}
               className="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200/80 flex flex-col group transition-all hover:shadow-md hover:border-purple-300"
             >
-              {/* Thumbnail with "Free Demo" badge & duration - clicking opens Telegram channel demo post directly */}
+              {/* Thumbnail with "Free Demo" badge & duration - clicking opens Demo & Unlock modal */}
               <div
-                onClick={openDemoOnTelegram}
+                onClick={() => onOpenAdLockedVideo?.(video)}
                 className="relative aspect-video bg-slate-900 overflow-hidden cursor-pointer"
-                title="ক্লিক করে টেলিগ্রাম চ্যানেলে ডেমো ভিডিওটি সরাসরি দেখুন"
+                title="ক্লিক করে ডেমো ও ফুল ভিডিও আনলক পপআপ দেখুন"
               >
                 <img
                   src={video.thumbnail}
@@ -507,7 +513,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                   </div>
                 </div>
                 <div className="absolute top-1.5 right-1.5 bg-black/85 text-white text-[9px] font-extrabold px-2 py-0.5 rounded-md border border-white/20 flex items-center gap-1">
-                  <span>🎥 টেলিগ্রাম ডেমো</span>
+                  <span>🎥 ডেমো ও আনলক</span>
                 </div>
                 <div className="absolute bottom-1.5 left-1.5 bg-black/75 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
                   {video.previewDuration}
@@ -521,9 +527,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({
               <div className="p-2.5 flex-1 flex flex-col justify-between">
                 <div>
                   <h4
-                    onClick={openDemoOnTelegram}
+                    onClick={() => onOpenAdLockedVideo?.(video)}
                     className="text-xs font-bold text-slate-900 line-clamp-2 leading-tight mb-1 hover:text-purple-600 cursor-pointer transition-colors"
-                    title="ক্লিক করে টেলিগ্রাম চ্যানেলে ডেমো ভিডিওটি দেখুন"
+                    title="ক্লিক করে ডেমো ও ফুল ভিডিও আনলক পপআপ দেখুন"
                   >
                     {video.title}
                   </h4>
