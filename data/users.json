@@ -104,22 +104,19 @@
     "inactiveCount": 0,
     "todayReferrals": 0,
     "activeReferralsWithActivity": 0,
-    "adsWatchedToday": 4,
+    "adsWatchedToday": 0,
     "dailyAdLimit": 40,
     "referralCode": "user_7359932887",
     "language": "bn",
     "currency": "BDT",
     "claimedDailyTiers": [],
-    "completedTaskIds": [
-      "task-ad-1",
-      "task-ad-2"
-    ],
+    "completedTaskIds": [],
     "referralCommissionRate": 5,
     "totalCommissionEarnedUsd": 0,
     "claimableCommissionUsd": 0,
     "referralCommissionHistory": [],
     "createdAt": "2026-09-26T05:25:02.509Z",
-    "lastActiveDate": "2026-09-26",
+    "lastActiveDate": "2026-09-27",
     "balanceBdt": 0
   },
   "guest_user": {
