@@ -203,6 +203,7 @@
     "totalCommissionEarnedUsd": 0,
     "claimableCommissionUsd": 0,
     "referralCommissionHistory": [],
-    "createdAt": "2026-09-26T06:55:09.643Z"
+    "createdAt": "2026-09-26T06:55:09.643Z",
+    "balanceBdt": 0
   }
 }
