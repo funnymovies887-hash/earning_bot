@@ -1,0 +1,6 @@
+{
+  "name": "Cholo Income Kori",
+  "description": "Cholo Income Kori Telegram Mini App (@CholoIncomeKoriBot) featuring task rewards, video ads, referral bonuses, real-time cloud data sync, multi-currency display, push notifications, and instant payment withdrawals.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

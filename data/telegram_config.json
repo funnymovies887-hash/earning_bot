@@ -1,0 +1,10 @@
+{
+  "botToken": "",
+  "botUsername": "PremiumVideoDeliveryBot",
+  "deliveryBotHandle": "PremiumVideoDeliveryBot",
+  "channel1Handle": "@CholoIncomeKori",
+  "channel1Url": "https://t.me/CholoIncomeKori",
+  "channel2Handle": "@IncomeBD_Online",
+  "channel2Url": "https://t.me/IncomeBD_Online",
+  "enforceOnEveryVisit": true
+}

@@ -1,0 +1,2852 @@
+import express from "express";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
+import { createServer as createViteServer } from "vite";
+import {
+  INITIAL_VIDEOS,
+  INITIAL_AD_LOCKED_VIDEOS,
+  INITIAL_DIGITAL_PACKAGES,
+  INITIAL_PACKAGE_ORDERS,
+  DEFAULT_PAYMENT_CONFIG,
+  INITIAL_INCOME_TASKS,
+} from "./src/data";
+import { IncomeTask } from "./src/types";
+
+// Derive directory safely in both dev (tsx/ESM) and prod (bundled CJS)
+const currentDir = typeof __dirname !== 'undefined' ? __dirname : process.cwd();
+
+// Local Disk Persistent Storage System (Guarantees data survives Render sleep, restarts, and redeployments)
+const DATA_DIR = path.join(process.cwd(), "data");
+if (!fs.existsSync(DATA_DIR)) {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  } catch (err) {
+    console.error("Failed to create data directory:", err);
+  }
+}
+
+function loadJsonFile<T>(filename: string, fallback: T): T {
+  try {
+    const filePath = path.join(DATA_DIR, filename);
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, "utf-8");
+      const parsed = JSON.parse(content);
+      if (Array.isArray(fallback) && Array.isArray(parsed)) {
+        return parsed as T;
+      } else if (!Array.isArray(fallback) && parsed && typeof parsed === "object") {
+        return parsed as T;
+      }
+    }
+  } catch (err) {
+    console.warn(`[Storage] Failed to read ${filename}:`, err);
+  }
+  return fallback;
+}
+
+function saveJsonFile<T>(filename: string, data: T): void {
+  try {
+    const filePath = path.join(DATA_DIR, filename);
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+  } catch (err) {
+    console.error(`[Storage] Failed to save ${filename}:`, err);
+  }
+}
+
+// Persistent user profiles state (multi-tenant support)
+const ADMIN_ID = "usr_78912";
+const DEFAULT_ADMIN_PROFILE = {
+  id: ADMIN_ID,
+  username: "@RUBI_SH",
+  displayName: "SALAUDDIN SH (ADMIN)",
+  email: "funnymovies887@gmail.com",
+  avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+  role: "VIP Platinum Member",
+  balanceUsd: 3.10,
+  pendingReferralBonusUsd: 0.00,
+  joinedCount: 0,
+  activeCount: 0,
+  inactiveCount: 0,
+  todayReferrals: 0,
+  activeReferralsWithActivity: 3,
+  adsWatchedToday: 0,
+  dailyAdLimit: 40,
+  referralCode: "choloincome_bot",
+  language: "bn",
+  currency: "BDT",
+  claimedDailyTiers: [] as number[],
+  completedTaskIds: [] as string[],
+  referralCommissionRate: 5,
+  totalCommissionEarnedUsd: 0.00,
+  claimableCommissionUsd: 0.00,
+  referralCommissionHistory: [] as any[],
+  createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
+};
+
+let usersMap: Record<string, any> = loadJsonFile("users.json", {});
+if (!usersMap[ADMIN_ID]) {
+  const oldProfile = loadJsonFile("user_profile.json", null);
+  usersMap[ADMIN_ID] = oldProfile || { ...DEFAULT_ADMIN_PROFILE };
+  saveJsonFile("users.json", usersMap);
+}
+
+// Helper to get or create isolated user profile
+function getRequestUser(req: express.Request): any {
+  const rawId = (
+    req.headers["x-user-id"] ||
+    req.query.userId ||
+    req.body?.userId ||
+    req.body?.user?.id ||
+    req.body?.id
+  ) as string;
+
+  const cleanId = rawId ? String(rawId).trim() : "";
+
+  if (cleanId) {
+    // Only return admin profile if explicitly matching ADMIN_ID and accessed as admin
+    if (cleanId === ADMIN_ID) {
+      return usersMap[ADMIN_ID] || { ...DEFAULT_ADMIN_PROFILE };
+    }
+
+    if (usersMap[cleanId]) {
+      const qName = (req.query.displayName || req.body?.displayName) as string;
+      const qUsername = (req.query.username || req.body?.username) as string;
+      const qAvatar = (req.query.avatarUrl || req.body?.avatarUrl) as string;
+      let changed = false;
+      if (qName && qName !== usersMap[cleanId].displayName && !qName.includes("SALAUDDIN")) {
+        usersMap[cleanId].displayName = qName;
+        changed = true;
+      }
+      if (qUsername && qUsername !== usersMap[cleanId].username && !qUsername.includes("RUBI_SH")) {
+        usersMap[cleanId].username = qUsername.startsWith("@") ? qUsername : `@${qUsername}`;
+        changed = true;
+      }
+      if (qAvatar && (!usersMap[cleanId].avatarUrl || usersMap[cleanId].avatarUrl.includes("dicebear"))) {
+        usersMap[cleanId].avatarUrl = qAvatar;
+        changed = true;
+      }
+      if (changed) {
+        saveJsonFile("users.json", usersMap);
+      }
+      return usersMap[cleanId];
+    }
+
+    // Check if it's admin username (ONLY for admin login)
+    if (cleanId.toLowerCase() === "@rubi_sh" || cleanId.toLowerCase() === "rubi_sh" || cleanId.toLowerCase() === "funnymovies887") {
+      return usersMap[ADMIN_ID] || { ...DEFAULT_ADMIN_PROFILE };
+    }
+
+    // Auto-create isolated brand new user profile with 0.00 balance!
+    const qName = (req.query.displayName || req.body?.displayName) as string;
+    const qUsername = (req.query.username || req.body?.username) as string;
+    const qAvatar = (req.query.avatarUrl || req.body?.avatarUrl) as string;
+
+    const newUser = {
+      id: cleanId,
+      username: qUsername ? (qUsername.startsWith("@") ? qUsername : `@${qUsername}`) : `@user_${cleanId.slice(-5)}`,
+      displayName: qName || `সদস্য #${cleanId.slice(-4)}`,
+      email: "",
+      avatarUrl: qAvatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanId}`,
+      role: "Free Member",
+      balanceUsd: 0.00,
+      pendingReferralBonusUsd: 0.00,
+      joinedCount: 0,
+      activeCount: 0,
+      inactiveCount: 0,
+      todayReferrals: 0,
+      activeReferralsWithActivity: 0,
+      adsWatchedToday: 0,
+      dailyAdLimit: 40,
+      referralCode: `user_${cleanId}`,
+      language: "bn",
+      currency: "BDT",
+      claimedDailyTiers: [],
+      completedTaskIds: [],
+      referralCommissionRate: 5,
+      totalCommissionEarnedUsd: 0.00,
+      claimableCommissionUsd: 0.00,
+      referralCommissionHistory: [],
+      createdAt: new Date().toISOString(),
+    };
+    usersMap[cleanId] = newUser;
+    saveJsonFile("users.json", usersMap);
+    return newUser;
+  }
+
+  // Fallback: ALWAYS return a clean Guest User with 0.00 balance. NEVER return ADMIN!
+  const defaultGuestId = "guest_user";
+  if (!usersMap[defaultGuestId]) {
+    usersMap[defaultGuestId] = {
+      id: defaultGuestId,
+      username: "@guest_user",
+      displayName: "নতুন ইউজার",
+      email: "",
+      avatarUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=guest",
+      role: "Free Member",
+      balanceUsd: 0.00,
+      pendingReferralBonusUsd: 0.00,
+      joinedCount: 0,
+      activeCount: 0,
+      inactiveCount: 0,
+      todayReferrals: 0,
+      activeReferralsWithActivity: 0,
+      adsWatchedToday: 0,
+      dailyAdLimit: 40,
+      referralCode: "cholo_guest",
+      language: "bn",
+      currency: "BDT",
+      claimedDailyTiers: [],
+      completedTaskIds: [],
+      referralCommissionRate: 5,
+      totalCommissionEarnedUsd: 0.00,
+      claimableCommissionUsd: 0.00,
+      referralCommissionHistory: [],
+      createdAt: new Date().toISOString(),
+    };
+    saveJsonFile("users.json", usersMap);
+  }
+  return usersMap[defaultGuestId];
+}
+
+// Persistent Videos / Earning Video Tasks (guaranteed to survive Render sleep & restarts)
+let serverVideos = loadJsonFile("videos.json", [...INITIAL_VIDEOS]);
+if (!fs.existsSync(path.join(DATA_DIR, "videos.json"))) {
+  saveJsonFile("videos.json", serverVideos);
+}
+
+// Persistent Withdrawals
+let withdrawals: Array<{
+  id: string;
+  userId: string;
+  userName: string;
+  method: string;
+  accountNumber: string;
+  amount: number;
+  currency: string;
+  status: string;
+  createdAt: string;
+}> = loadJsonFile("withdrawals.json", []);
+if (!fs.existsSync(path.join(DATA_DIR, "withdrawals.json"))) {
+  saveJsonFile("withdrawals.json", withdrawals);
+}
+
+// Persistent Ad-Locked Videos
+let serverAdVideos: any[] = loadJsonFile("ad_videos.json", []);
+if (!fs.existsSync(path.join(DATA_DIR, "ad_videos.json"))) {
+  saveJsonFile("ad_videos.json", serverAdVideos);
+}
+
+// Persistent Telegram verification settings
+const DEFAULT_TG_CONFIG = {
+  botToken: process.env.TELEGRAM_BOT_TOKEN || "",
+  botUsername: "PremiumVideoDeliveryBot",
+  deliveryBotHandle: "PremiumVideoDeliveryBot",
+  channel1Handle: "@CholoIncomeKori",
+  channel1Url: "https://t.me/CholoIncomeKori",
+  channel2Handle: "@IncomeBD_Online",
+  channel2Url: "https://t.me/IncomeBD_Online",
+  enforceOnEveryVisit: true,
+};
+let telegramConfig = loadJsonFile("telegram_config.json", { ...DEFAULT_TG_CONFIG });
+if (!fs.existsSync(path.join(DATA_DIR, "telegram_config.json"))) {
+  saveJsonFile("telegram_config.json", telegramConfig);
+}
+
+// Persistent 5 Income Methods and Rules
+const DEFAULT_INCOME_METHODS_CONFIG = {
+  ads: {
+    enabled: true,
+    rewardBdt: 1.5,
+    rewardUsd: 0.0125,
+    dailyLimit: 40,
+    directAdUrl: "https://omg10.com/4/11869572",
+  },
+  webVisit: {
+    enabled: true,
+    rewardBdt: 3.0,
+    rewardUsd: 0.025,
+  },
+  telegram: {
+    enabled: true,
+    rewardBdt: 5.0,
+    rewardUsd: 0.0416,
+  },
+  mission: {
+    enabled: true,
+    rewardBdt: 10.0,
+    rewardUsd: 0.0833,
+  },
+  referral: {
+    enabled: true,
+    bonusBdt: 10.0,
+    bonusUsd: 0.0833,
+    commissionPercent: 5,
+    minActiveReferralsForWithdraw: 3,
+    minIncomeForActiveReferralBdt: 10.0,
+    minWithdrawBdt: 25.0,
+  },
+};
+let incomeMethodsConfig = loadJsonFile("income_methods_config.json", { ...DEFAULT_INCOME_METHODS_CONFIG });
+if (!fs.existsSync(path.join(DATA_DIR, "income_methods_config.json"))) {
+  saveJsonFile("income_methods_config.json", incomeMethodsConfig);
+}
+
+let livePayouts = [
+  { id: 'p-1', userName: 'Badsha Khan', amount: '$10.30', method: 'bKash', timeAgo: '1m ago', status: 'Success' },
+  { id: 'p-2', userName: 'Rahman', amount: '৳ 1,500', method: 'Nagad', timeAgo: '3m ago', status: 'Success' },
+  { id: 'p-3', userName: 'Samiul', amount: '$25.00', method: 'Binance Pay', timeAgo: '6m ago', status: 'Success' },
+  { id: 'p-4', userName: 'Anik Hasan', amount: '৳ 850', method: 'Rocket', timeAgo: '9m ago', status: 'Success' },
+  { id: 'p-5', userName: 'Tanvir Hossain', amount: '$15.00', method: 'bKash', timeAgo: '12m ago', status: 'Success' },
+  { id: 'p-6', userName: 'Rajesh Kumar', amount: '₹ 1,200', method: 'PayTM', timeAgo: '15m ago', status: 'Success' },
+];
+
+let pushSubscriptions: any[] = [];
+
+// Ad-Locked Videos & 90-Minute Expiry State
+let serverAdLockedVideos = loadJsonFile("ad_videos.json", [...INITIAL_AD_LOCKED_VIDEOS]);
+if (!fs.existsSync(path.join(DATA_DIR, "ad_videos.json"))) {
+  saveJsonFile("ad_videos.json", serverAdLockedVideos);
+}
+
+let userVideoSessions: Record<string, {
+  videoId: string;
+  userId: string;
+  adsWatched: number;
+  unlocked: boolean;
+  unlockedAt?: number;
+  expiresAt?: number;
+}> = {};
+
+// Digital Packages & Store Orders State with Disk Persistence
+let deletedPackageIds: string[] = loadJsonFile("deleted_package_ids.json", []);
+let serverPackages = loadJsonFile("packages.json", [...INITIAL_DIGITAL_PACKAGES]);
+if (deletedPackageIds.length > 0) {
+  serverPackages = serverPackages.filter((p) => !deletedPackageIds.includes(p.id));
+}
+if (!fs.existsSync(path.join(DATA_DIR, "packages.json"))) {
+  saveJsonFile("packages.json", serverPackages);
+}
+
+// Scheduled Telegram Video Auto-Deletions (90-Minute Expiry)
+interface ScheduledVideoDeletion {
+  chatId: string;
+  messageId: number;
+  deleteAt: number;
+  videoTitle: string;
+}
+let scheduledDeletions: ScheduledVideoDeletion[] = loadJsonFile("scheduled_deletions.json", []);
+
+async function cleanupExpiredTelegramVideos() {
+  const token = telegramConfig.botToken || process.env.TELEGRAM_BOT_TOKEN;
+  if (!token || scheduledDeletions.length === 0) return;
+
+  const now = Date.now();
+  const remaining: ScheduledVideoDeletion[] = [];
+
+  for (const item of scheduledDeletions) {
+    if (item.deleteAt <= now) {
+      try {
+        console.log(`[AutoDelete] Deleting expired video message ${item.messageId} from channel ${item.chatId} ("${item.videoTitle}")`);
+        await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: item.chatId, message_id: item.messageId }),
+        });
+      } catch (err: any) {
+        console.warn(`[AutoDelete] Failed to delete message ${item.messageId}:`, err.message);
+      }
+    } else {
+      remaining.push(item);
+    }
+  }
+
+  if (remaining.length !== scheduledDeletions.length) {
+    scheduledDeletions = remaining;
+    saveJsonFile("scheduled_deletions.json", scheduledDeletions);
+  }
+}
+
+// Check every 60 seconds
+setInterval(cleanupExpiredTelegramVideos, 60 * 1000);
+setTimeout(cleanupExpiredTelegramVideos, 5000);
+
+let serverOrders = loadJsonFile("orders.json", [...INITIAL_PACKAGE_ORDERS]);
+if (!fs.existsSync(path.join(DATA_DIR, "orders.json"))) {
+  saveJsonFile("orders.json", serverOrders);
+}
+
+let serverPaymentConfig = loadJsonFile("payment_config.json", { ...DEFAULT_PAYMENT_CONFIG });
+if (!fs.existsSync(path.join(DATA_DIR, "payment_config.json"))) {
+  saveJsonFile("payment_config.json", serverPaymentConfig);
+}
+
+// 5 Income Methods Tasks (Adsterra, Monetag, Telegram, Missions, Special)
+let serverTasks: IncomeTask[] = loadJsonFile("tasks.json", [...INITIAL_INCOME_TASKS]);
+if (!fs.existsSync(path.join(DATA_DIR, "tasks.json"))) {
+  saveJsonFile("tasks.json", serverTasks);
+}
+
+// Broadcast Notice and Official Notice State with Persistence
+const DEFAULT_NOTICES = {
+  broadcastNotice: {
+    message: "আজ রাত ১২টায় সবার উইথড্র ক্লিয়ার করা হবে! রেফার বোনাস ডাবল চলছে...",
+    updatedAt: new Date().toISOString(),
+    isActive: true,
+  },
+  officialNotice: {
+    title: "Official Notice",
+    description: "📢 গুরুত্বপূর্ণ নোটিশ 📢 সবাই অ্যাড ভালোভাবে দেখতেছেন, ধন্যবাদ — কিন্তু অনেকেই এখনো অ্যাডে ক্লিক করছেন না।",
+    rules: [
+      "1️⃣ প্রতি ১০টা অ্যাড দেখার পর অন্তত ১টা অ্যাডে ক্লিক করবেন।",
+      "2️⃣ ক্লিক করার পর কমপক্ষে ১ মিনিট সেই ওয়েবপেজে অবস্থান করবেন।",
+      "3️⃣ তারপর পরবর্তী অ্যাডে যান।"
+    ],
+    warning: "⚠️ যদি নিয়ম অনুযায়ী ক্লিক ও ভিজিট না করেন, তাহলে সেই কাজের পেমেন্ট দেওয়া হবে না।",
+    footer: "ধন্যবাদ সবাইকে 🙏 — টিম ম্যানেজমেন্ট",
+    isActive: true,
+    updatedAt: new Date().toISOString(),
+  }
+};
+let noticesConfig = loadJsonFile("notices.json", { ...DEFAULT_NOTICES });
+if (!fs.existsSync(path.join(DATA_DIR, "notices.json"))) {
+  saveJsonFile("notices.json", noticesConfig);
+}
+
+// GitHub Auto-Sync & Auto-Commit Engine
+interface GitHubSyncConfig {
+  repo: string;          // e.g. "username/repo"
+  branch: string;        // default: "main"
+  token: string;         // Personal Access Token
+  autoSyncOnChange: boolean; // auto push whenever admin changes packages
+  lastSyncedAt?: string;
+  lastStatus?: string;
+}
+
+let githubSyncConfig: GitHubSyncConfig = loadJsonFile("github_sync_config.json", {
+  repo: process.env.GITHUB_REPO || "",
+  branch: process.env.GITHUB_BRANCH || "main",
+  token: process.env.GITHUB_TOKEN || "",
+  autoSyncOnChange: true,
+  lastStatus: "প্রস্তুত (Ready)",
+});
+
+async function pushFileToGitHubDirect(
+  repoPath: string,
+  contentString: string,
+  commitMessage: string
+): Promise<{ success: boolean; message: string; sha?: string }> {
+  if (!githubSyncConfig.token || !githubSyncConfig.repo) {
+    return { success: false, message: "GitHub Repository ও Token কনফিগার করা নেই।" };
+  }
+
+  const cleanRepo = githubSyncConfig.repo.replace(/^https?:\/\/github\.com\//, "").replace(/\/$/, "").trim();
+  const branch = (githubSyncConfig.branch || "main").trim();
+  const apiUrl = `https://api.github.com/repos/${cleanRepo}/contents/${repoPath}?ref=${encodeURIComponent(branch)}`;
+
+  const headers: Record<string, string> = {
+    "Authorization": `Bearer ${githubSyncConfig.token.trim()}`,
+    "Accept": "application/vnd.github.v3+json",
+    "User-Agent": "CholoIncomeBot-AdminSync/1.0",
+  };
+
+  try {
+    let existingSha: string | undefined = undefined;
+    const getRes = await fetch(apiUrl, { headers });
+    if (getRes.ok) {
+      const getJson: any = await getRes.json();
+      existingSha = getJson.sha;
+    } else if (getRes.status !== 404) {
+      const errJson: any = await getRes.json().catch(() => ({}));
+      return {
+        success: false,
+        message: `GitHub ফাইল পাওয়া যায়নি (${getRes.status}): ${errJson.message || getRes.statusText}`,
+      };
+    }
+
+    const putUrl = `https://api.github.com/repos/${cleanRepo}/contents/${repoPath}`;
+    const base64Content = Buffer.from(contentString, "utf-8").toString("base64");
+    const body: any = {
+      message: commitMessage,
+      content: base64Content,
+      branch: branch,
+    };
+    if (existingSha) {
+      body.sha = existingSha;
+    }
+
+    const putRes = await fetch(putUrl, {
+      method: "PUT",
+      headers: {
+        ...headers,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const putJson: any = await putRes.json().catch(() => ({}));
+
+    if (putRes.ok) {
+      githubSyncConfig.lastSyncedAt = new Date().toISOString();
+      githubSyncConfig.lastStatus = `✅ সফলভাবে '${repoPath}' গিটহাবে পুশ হয়েছে (${new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka' })})`;
+      saveJsonFile("github_sync_config.json", githubSyncConfig);
+      return { success: true, message: `সফলভাবে '${repoPath}' কমিট হয়েছে!`, sha: putJson.content?.sha };
+    } else {
+      const errMsg = putJson.message || putRes.statusText;
+      githubSyncConfig.lastStatus = `❌ পুশ ত্রুটি: ${errMsg}`;
+      saveJsonFile("github_sync_config.json", githubSyncConfig);
+      return { success: false, message: `GitHub API ত্রুটি (${putRes.status}): ${errMsg}` };
+    }
+  } catch (err: any) {
+    return { success: false, message: "নেটওয়ার্ক সংযোগ ত্রুটি: " + err.message };
+  }
+}
+
+async function startServer() {
+  const app = express();
+  const PORT = Number(process.env.PORT) || 3000;
+
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+
+  // API Routes
+  app.get("/api/health", (_req, res) => {
+    res.json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      uptimeSeconds: Math.floor(process.uptime()),
+      service: "Cholo Income Kori 24/7 Engine",
+      serverTime: new Date().toLocaleString("en-US", { timeZone: "Asia/Dhaka" }),
+    });
+  });
+
+  // Public Notices endpoint (Broadcast & Official Notice)
+  app.get("/api/notices", (_req, res) => {
+    res.json({
+      success: true,
+      broadcastNotice: noticesConfig.broadcastNotice,
+      officialNotice: noticesConfig.officialNotice,
+    });
+  });
+
+  // User Profile - Multi-tenant isolated profile by user ID
+  app.get("/api/user", (req, res) => {
+    const user = getRequestUser(req);
+    res.json({ success: true, user, ...user });
+  });
+
+  // Sync Telegram User or Browser User on app launch
+  app.post("/api/user/sync", (req, res) => {
+    const {
+      id,
+      tgId,
+      username,
+      first_name,
+      last_name,
+      photo_url,
+      language,
+      currency,
+      balanceUsd,
+      adsWatchedToday,
+      completedTaskIds,
+      lastActiveDate,
+    } = req.body || {};
+
+    const rawId = tgId || id || req.headers["x-user-id"];
+    if (!rawId) {
+      const user = getRequestUser(req);
+      return res.json({ success: true, user, isNew: false });
+    }
+
+    const userId = String(rawId).trim();
+    let existing = usersMap[userId];
+    const todayDateStr = new Date(Date.now() + 6 * 3600 * 1000).toISOString().slice(0, 10);
+
+    if (existing) {
+      if (first_name || last_name) {
+        existing.displayName = [first_name, last_name].filter(Boolean).join(" ");
+      }
+      if (username) {
+        existing.username = username.startsWith("@") ? username : `@${username}`;
+      }
+      if (photo_url && (!existing.avatarUrl || existing.avatarUrl.includes("dicebear"))) {
+        existing.avatarUrl = photo_url;
+      }
+      if (language && ['en', 'bn', 'hi', 'ur'].includes(language)) existing.language = language;
+      if (currency && ['USD', 'BDT', 'INR'].includes(currency)) existing.currency = currency;
+
+      // Handle daily date reset logic:
+      // If user lastActiveDate is from a previous calendar day, reset daily count
+      if (existing.lastActiveDate && existing.lastActiveDate !== todayDateStr) {
+        existing.adsWatchedToday = 0;
+        existing.completedTaskIds = [];
+        existing.lastActiveDate = todayDateStr;
+      } else {
+        // Same calendar day: MERGE so we NEVER lose progress on reload/sync!
+        existing.lastActiveDate = todayDateStr;
+        if (typeof adsWatchedToday === 'number' && !isNaN(adsWatchedToday)) {
+          existing.adsWatchedToday = Math.max(Number(existing.adsWatchedToday || 0), Number(adsWatchedToday));
+        }
+        if (Array.isArray(completedTaskIds)) {
+          existing.completedTaskIds = Array.from(new Set([...(existing.completedTaskIds || []), ...completedTaskIds]));
+        }
+      }
+
+      // Balance is NEVER lost or downgraded!
+      if (typeof balanceUsd === 'number' && !isNaN(balanceUsd) && balanceUsd > 0) {
+        existing.balanceUsd = Math.max(Number(existing.balanceUsd || 0), Number(balanceUsd));
+      }
+
+      saveJsonFile("users.json", usersMap);
+      return res.json({ success: true, user: existing, isNew: false });
+    }
+
+    // Check if user is the admin by username
+    const cleanUsername = username ? (username.startsWith("@") ? username : `@${username}`).toLowerCase() : "";
+    if (cleanUsername === "@rubi_sh" || cleanUsername === "rubi_sh" || cleanUsername === "funnymovies887" || userId === ADMIN_ID) {
+      const adminUser = usersMap[ADMIN_ID];
+      if (first_name || last_name) {
+        adminUser.displayName = [first_name, last_name].filter(Boolean).join(" ");
+      }
+      if (photo_url) adminUser.avatarUrl = photo_url;
+      saveJsonFile("users.json", usersMap);
+      return res.json({ success: true, user: adminUser, isNew: false });
+    }
+
+    // Brand new user registration with 0.00 USD / 0 BDT balance
+    const displayName = [first_name, last_name].filter(Boolean).join(" ") || (username ? `@${username}` : `সদস্য #${userId.slice(-4)}`);
+    const finalUsername = username ? (username.startsWith("@") ? username : `@${username}`) : `@user_${userId.slice(-5)}`;
+    const referralCode = username ? username.replace("@", "") : `user_${userId}`;
+
+    const newUser = {
+      id: userId,
+      username: finalUsername,
+      displayName: displayName,
+      email: "",
+      avatarUrl: photo_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${userId}`,
+      role: "Free Member",
+      balanceUsd: 0.00, // 100% ISOLATED: ZERO BALANCE FOR REGULAR NEW USERS
+      pendingReferralBonusUsd: 0.00,
+      joinedCount: 0,
+      activeCount: 0,
+      inactiveCount: 0,
+      todayReferrals: 0,
+      activeReferralsWithActivity: 0,
+      adsWatchedToday: 0,
+      dailyAdLimit: 40,
+      referralCode: referralCode,
+      language: language || "bn",
+      currency: currency || "BDT",
+      claimedDailyTiers: [],
+      completedTaskIds: [],
+      referralCommissionRate: 5,
+      totalCommissionEarnedUsd: 0.00,
+      claimableCommissionUsd: 0.00,
+      referralCommissionHistory: [],
+      createdAt: new Date().toISOString(),
+    };
+
+    usersMap[userId] = newUser;
+    saveJsonFile("users.json", usersMap);
+    return res.json({ success: true, user: newUser, isNew: true });
+  });
+
+  app.post("/api/user", (req, res) => {
+    const user = getRequestUser(req);
+    Object.assign(user, req.body);
+    saveJsonFile("users.json", usersMap);
+    res.json({ success: true, user, ...user });
+  });
+
+  app.post("/api/user/update", (req, res) => {
+    const user = getRequestUser(req);
+    const body = req.body || {};
+    const todayDateStr = new Date(Date.now() + 6 * 3600 * 1000).toISOString().slice(0, 10);
+
+    let sanitizedLang = user.language;
+    if (typeof body.language === 'string' && ['en', 'bn', 'hi', 'ur'].includes(body.language)) {
+      sanitizedLang = body.language;
+    }
+    let sanitizedCurr = user.currency;
+    if (typeof body.currency === 'string' && ['USD', 'BDT', 'INR'].includes(body.currency)) {
+      sanitizedCurr = body.currency;
+    }
+
+    // Merge balance (NEVER drop or wipe balance)
+    if (typeof body.balanceUsd === 'number' && !isNaN(body.balanceUsd)) {
+      user.balanceUsd = Math.max(Number(user.balanceUsd || 0), Number(body.balanceUsd));
+    }
+
+    // Handle daily limit & tasks
+    if (user.lastActiveDate && user.lastActiveDate !== todayDateStr) {
+      user.adsWatchedToday = 0;
+      user.completedTaskIds = [];
+      user.lastActiveDate = todayDateStr;
+    } else {
+      user.lastActiveDate = todayDateStr;
+      if (typeof body.adsWatchedToday === 'number' && !isNaN(body.adsWatchedToday)) {
+        user.adsWatchedToday = Math.max(Number(user.adsWatchedToday || 0), Number(body.adsWatchedToday));
+      }
+      if (Array.isArray(body.completedTaskIds)) {
+        user.completedTaskIds = Array.from(new Set([...(user.completedTaskIds || []), ...body.completedTaskIds]));
+      }
+    }
+
+    if (body.displayName) user.displayName = body.displayName;
+    if (body.username) user.username = body.username;
+    if (body.avatarUrl) user.avatarUrl = body.avatarUrl;
+    if (body.phone) user.phone = body.phone;
+    if (body.email) user.email = body.email;
+    if (typeof body.dailyAdLimit === 'number') user.dailyAdLimit = body.dailyAdLimit;
+
+    user.language = sanitizedLang;
+    user.currency = sanitizedCurr;
+
+    saveJsonFile("users.json", usersMap);
+    res.json({ success: true, user, ...user });
+  });
+
+  // Complete task / Ad watch
+  app.post("/api/user/complete-task", (req, res) => {
+    const user = getRequestUser(req);
+    const { taskId, rewardUsd, type } = req.body;
+    const todayDateStr = new Date(Date.now() + 6 * 3600 * 1000).toISOString().slice(0, 10);
+    user.lastActiveDate = todayDateStr;
+
+    if (type === 'ad' && (user.adsWatchedToday || 0) >= (user.dailyAdLimit || 40)) {
+      return res.status(400).json({
+        error: `আজকের অ্যাড দেখার সর্বোচ্চ সীমা (${user.dailyAdLimit || 40} টি) পূর্ণ হয়েছে! অ্যাকাউন্ট সুরক্ষিত রাখতে আগামী কাল আবার চেষ্টা করুন।`,
+      });
+    }
+
+    if (!user.completedTaskIds) user.completedTaskIds = [];
+    if (!user.completedTaskIds.includes(taskId)) {
+      user.completedTaskIds.push(taskId);
+      user.balanceUsd = +(Number(user.balanceUsd || 0) + (rewardUsd || 0.0125)).toFixed(4);
+      user.adsWatchedToday = (user.adsWatchedToday || 0) + 1;
+    }
+    saveJsonFile("users.json", usersMap);
+    res.json({ success: true, user });
+  });
+
+  // Claim Tier Reward
+  app.post("/api/user/claim-tier", (req, res) => {
+    const user = getRequestUser(req);
+    const { tierIndex, rewardUsd } = req.body;
+    if (!user.claimedDailyTiers) user.claimedDailyTiers = [];
+    if (!user.claimedDailyTiers.includes(tierIndex)) {
+      user.claimedDailyTiers.push(tierIndex);
+      user.balanceUsd = +(Number(user.balanceUsd || 0) + (rewardUsd || 0)).toFixed(2);
+    }
+    saveJsonFile("users.json", usersMap);
+    res.json({ success: true, user });
+  });
+
+  // Referral increment
+  app.post("/api/user/refer-friend", (req, res) => {
+    const user = getRequestUser(req);
+    user.joinedCount = (user.joinedCount || 0) + 1;
+    user.activeCount = (user.activeCount || 0) + 1;
+    user.todayReferrals = (user.todayReferrals || 0) + 1;
+    user.pendingReferralBonusUsd = +(Number(user.pendingReferralBonusUsd || 0) + 1.00).toFixed(2);
+    saveJsonFile("users.json", usersMap);
+    res.json({ success: true, user });
+  });
+
+  // Claim 5% Referral Commission to main balance
+  app.post("/api/user/claim-commission", (req, res) => {
+    const user = getRequestUser(req);
+    const claimable = user.claimableCommissionUsd || 0;
+    if (claimable > 0) {
+      user.balanceUsd = +(Number(user.balanceUsd || 0) + claimable).toFixed(2);
+      user.claimableCommissionUsd = 0;
+    }
+    saveJsonFile("users.json", usersMap);
+    res.json({ success: true, user, claimedUsd: claimable });
+  });
+
+  // Add 5% Referral Commission from active downline
+  app.post("/api/user/referral-commission", (req, res) => {
+    const user = getRequestUser(req);
+    const { userEarnedUsd = 0.40, userFrom = '@friend_earner' } = req.body || {};
+    const commissionUsd = +(userEarnedUsd * 0.05).toFixed(3);
+    user.totalCommissionEarnedUsd = +(
+      Number(user.totalCommissionEarnedUsd || 0) + commissionUsd
+    ).toFixed(2);
+    user.claimableCommissionUsd = +(
+      Number(user.claimableCommissionUsd || 0) + commissionUsd
+    ).toFixed(2);
+
+    const history = user.referralCommissionHistory || [];
+    history.unshift({
+      id: 'comm-' + Date.now(),
+      userFrom,
+      activity: 'টাস্ক সম্পন্ন করেছে (Task Reward)',
+      userEarnedUsd,
+      commissionUsd,
+      time: 'এইমাত্র',
+    });
+    user.referralCommissionHistory = history.slice(0, 20);
+    saveJsonFile("users.json", usersMap);
+
+    res.json({ success: true, user, commissionUsd });
+  });
+
+  // Get current 5 Income Methods configuration
+  app.get("/api/income-methods", (_req, res) => {
+    res.json({
+      success: true,
+      config: incomeMethodsConfig,
+    });
+  });
+
+  // Admin: Update 5 Income Methods configuration
+  app.post("/api/admin/income-methods", (req, res) => {
+    const updated = req.body;
+    if (updated && typeof updated === "object") {
+      incomeMethodsConfig = {
+        ...incomeMethodsConfig,
+        ...updated,
+        ads: { ...incomeMethodsConfig.ads, ...(updated.ads || {}) },
+        webVisit: { ...incomeMethodsConfig.webVisit, ...(updated.webVisit || {}) },
+        telegram: { ...incomeMethodsConfig.telegram, ...(updated.telegram || {}) },
+        mission: { ...incomeMethodsConfig.mission, ...(updated.mission || {}) },
+        referral: { ...incomeMethodsConfig.referral, ...(updated.referral || {}) },
+      };
+      saveJsonFile("income_methods_config.json", incomeMethodsConfig);
+    }
+    res.json({
+      success: true,
+      message: "ইনকাম মেথড ও নিয়মাবলি সফলভাবে আপডেট করা হয়েছে!",
+      config: incomeMethodsConfig,
+    });
+  });
+
+  // ----------------------------------------------------
+  // 5 Income Methods Dynamic Task Management API
+  // ----------------------------------------------------
+
+  // Public: Get all active tasks, optionally filtered by category (ads, visit, telegram, mission, special)
+  app.get("/api/tasks", (req, res) => {
+    const category = req.query.category as string;
+    let list = serverTasks.filter((t) => t.isActive !== false);
+    if (category) {
+      list = list.filter((t) => t.category === category);
+    }
+    res.json({ success: true, tasks: list });
+  });
+
+  // Admin: Get all tasks (both active and inactive) with stats
+  app.get("/api/admin/tasks", (req, res) => {
+    const category = req.query.category as string;
+    let list = [...serverTasks];
+    if (category) {
+      list = list.filter((t) => t.category === category);
+    }
+    res.json({
+      success: true,
+      tasks: list,
+      totalCount: serverTasks.length,
+      categoryCounts: {
+        ads: serverTasks.filter((t) => t.category === 'ads').length,
+        visit: serverTasks.filter((t) => t.category === 'visit').length,
+        telegram: serverTasks.filter((t) => t.category === 'telegram').length,
+        mission: serverTasks.filter((t) => t.category === 'mission').length,
+        special: serverTasks.filter((t) => t.category === 'special').length,
+      },
+    });
+  });
+
+  // Admin: Add a new task
+  app.post("/api/admin/tasks/add", (req, res) => {
+    const {
+      title,
+      category,
+      subCategory = "",
+      destinationUrl = "",
+      mediaType = "none",
+      mediaUrl = "",
+      rewardBdt,
+      rewardUsd,
+      timerSeconds = 15,
+      instructions = "",
+      isHot = false,
+      isActive = true,
+    } = req.body || {};
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: "টাস্কের শিরোনাম (Title) প্রদান করুন।" });
+    }
+
+    const validCategories = ['ads', 'visit', 'telegram', 'mission', 'special'];
+    const assignedCategory = validCategories.includes(category) ? category : 'visit';
+
+    let bdtAmount = typeof rewardBdt === 'number' ? rewardBdt : parseFloat(rewardBdt);
+    let usdAmount = typeof rewardUsd === 'number' ? rewardUsd : parseFloat(rewardUsd);
+
+    if (isNaN(bdtAmount) && isNaN(usdAmount)) {
+      bdtAmount = 1.0;
+      usdAmount = +(1.0 / 120).toFixed(6);
+    } else if (isNaN(bdtAmount)) {
+      bdtAmount = +(usdAmount * 120).toFixed(4);
+    } else if (isNaN(usdAmount)) {
+      usdAmount = +(bdtAmount / 120).toFixed(6);
+    }
+
+    const seconds = Math.max(0, parseInt(timerSeconds) || 0);
+
+    const newTask: IncomeTask = {
+      id: "task-" + Date.now() + "-" + Math.random().toString(36).substring(2, 6),
+      title: title.trim(),
+      category: assignedCategory,
+      subCategory: subCategory.trim() || (assignedCategory === 'visit' ? 'Adsterra Direct Link' : assignedCategory),
+      destinationUrl: destinationUrl.trim() || "https://google.com",
+      mediaType: mediaType || "none",
+      mediaUrl: mediaUrl.trim() || undefined,
+      rewardBdt: bdtAmount,
+      rewardUsd: usdAmount,
+      timerSeconds: seconds,
+      instructions: instructions.trim() || "কাজটি সম্পন্ন করে রিওয়ার্ড গ্রহণ করুন।",
+      isHot: Boolean(isHot),
+      isActive: isActive !== false,
+      createdAt: new Date().toISOString().split('T')[0],
+      totalCompletions: 0,
+    };
+
+    serverTasks.unshift(newTask);
+    saveJsonFile("tasks.json", serverTasks);
+
+    res.json({
+      success: true,
+      message: "নতুন টাস্ক সফলভাবে তৈরি ও যুক্ত করা হয়েছে!",
+      task: newTask,
+    });
+  });
+
+  // Admin: Edit an existing task
+  app.post("/api/admin/tasks/edit", (req, res) => {
+    const { id, title, category, subCategory, destinationUrl, mediaType, mediaUrl, rewardBdt, rewardUsd, timerSeconds, instructions, isHot, isActive } = req.body || {};
+    const taskIndex = serverTasks.findIndex((t) => t.id === id);
+
+    if (taskIndex === -1) {
+      return res.status(404).json({ error: "টাস্কটি খুঁজে পাওয়া যায়নি।" });
+    }
+
+    const current = serverTasks[taskIndex];
+    let bdtAmount = current.rewardBdt;
+    let usdAmount = current.rewardUsd;
+
+    if (rewardBdt !== undefined && rewardUsd !== undefined) {
+      bdtAmount = typeof rewardBdt === 'number' ? rewardBdt : parseFloat(rewardBdt);
+      usdAmount = typeof rewardUsd === 'number' ? rewardUsd : parseFloat(rewardUsd);
+    } else if (rewardBdt !== undefined) {
+      bdtAmount = typeof rewardBdt === 'number' ? rewardBdt : parseFloat(rewardBdt);
+      usdAmount = +(bdtAmount / 120).toFixed(6);
+    } else if (rewardUsd !== undefined) {
+      usdAmount = typeof rewardUsd === 'number' ? rewardUsd : parseFloat(rewardUsd);
+      bdtAmount = +(usdAmount * 120).toFixed(4);
+    }
+
+    const updatedTask: IncomeTask = {
+      ...current,
+      title: title ? title.trim() : current.title,
+      category: category || current.category,
+      subCategory: subCategory !== undefined ? subCategory.trim() : current.subCategory,
+      destinationUrl: destinationUrl !== undefined ? destinationUrl.trim() : current.destinationUrl,
+      mediaType: mediaType || current.mediaType,
+      mediaUrl: mediaUrl !== undefined ? mediaUrl.trim() : current.mediaUrl,
+      rewardBdt: bdtAmount,
+      rewardUsd: usdAmount,
+      timerSeconds: timerSeconds !== undefined ? Math.max(0, parseInt(timerSeconds)) : current.timerSeconds,
+      instructions: instructions !== undefined ? instructions.trim() : current.instructions,
+      isHot: isHot !== undefined ? Boolean(isHot) : current.isHot,
+      isActive: isActive !== undefined ? Boolean(isActive) : current.isActive,
+    };
+
+    serverTasks[taskIndex] = updatedTask;
+    saveJsonFile("tasks.json", serverTasks);
+
+    res.json({
+      success: true,
+      message: "টাস্ক সফলভাবে আপডেট করা হয়েছে!",
+      task: updatedTask,
+    });
+  });
+
+  // Admin: Delete a task
+  app.post("/api/admin/tasks/delete", (req, res) => {
+    const { id } = req.body || {};
+    const initialLen = serverTasks.length;
+    serverTasks = serverTasks.filter((t) => t.id !== id);
+
+    if (serverTasks.length === initialLen) {
+      return res.status(404).json({ error: "টাস্কটি পাওয়া যায়নি বা ইতোমধ্যে ডিলিট করা হয়েছে।" });
+    }
+    saveJsonFile("tasks.json", serverTasks);
+
+    res.json({
+      success: true,
+      message: "টাস্ক সফলভাবে ডিলিট করা হয়েছে!",
+      deletedId: id,
+    });
+  });
+
+  // Admin: Toggle task active/inactive status
+  app.post("/api/admin/tasks/toggle-active", (req, res) => {
+    const { id } = req.body || {};
+    const task = serverTasks.find((t) => t.id === id);
+    if (!task) {
+      return res.status(404).json({ error: "টাস্কটি পাওয়া যায়নি।" });
+    }
+    task.isActive = !task.isActive;
+    saveJsonFile("tasks.json", serverTasks);
+    res.json({
+      success: true,
+      message: task.isActive ? "টাস্কটি চালু (Active) করা হয়েছে" : "টাস্কটি সাময়িকভাবে বন্ধ (Inactive) করা হয়েছে",
+      task,
+    });
+  });
+
+  // User: Complete a task and receive reward
+  app.post("/api/tasks/complete", (req, res) => {
+    const user = getRequestUser(req);
+    const { taskId, rewardUsd } = req.body || {};
+    const todayDateStr = new Date(Date.now() + 6 * 3600 * 1000).toISOString().slice(0, 10);
+
+    // If date changed, reset daily counter
+    if (user.lastActiveDate && user.lastActiveDate !== todayDateStr) {
+      user.adsWatchedToday = 0;
+      user.completedTaskIds = [];
+    }
+    user.lastActiveDate = todayDateStr;
+
+    const task = serverTasks.find((t) => t.id === taskId);
+    const maxDailyLimit = incomeMethodsConfig?.ads?.dailyLimit || user.dailyAdLimit || 40;
+
+    if ((user.adsWatchedToday || 0) >= maxDailyLimit) {
+      return res.status(400).json({
+        error: `আজকের কাজের সর্বোচ্চ সীমা (${maxDailyLimit} টি) পূর্ণ হয়েছে! আগামী কাল আবার চেষ্টা করুন।`,
+      });
+    }
+
+    if (!user.completedTaskIds) user.completedTaskIds = [];
+    const alreadyDone = user.completedTaskIds.includes(taskId);
+    if (!alreadyDone) {
+      user.completedTaskIds.push(taskId);
+      const earned = Number(task?.rewardUsd || rewardUsd || 0.0125);
+      user.balanceUsd = +(Number(user.balanceUsd || 0) + earned).toFixed(4);
+      user.adsWatchedToday = (user.adsWatchedToday || 0) + 1;
+      if (task) {
+        task.totalCompletions = (task.totalCompletions || 0) + 1;
+        saveJsonFile("tasks.json", serverTasks);
+      }
+      saveJsonFile("users.json", usersMap);
+    }
+
+    res.json({
+      success: true,
+      alreadyCompleted: alreadyDone,
+      user,
+      task,
+      rewardUsd: task?.rewardUsd || rewardUsd || 0.0125,
+    });
+  });
+
+  // Public Telegram Config endpoint for client
+  app.get("/api/telegram/config", (_req, res) => {
+    res.json({
+      channel1Handle: telegramConfig.channel1Handle,
+      channel1Url: telegramConfig.channel1Url,
+      channel2Handle: telegramConfig.channel2Handle,
+      channel2Url: telegramConfig.channel2Url,
+      enforceOnEveryVisit: telegramConfig.enforceOnEveryVisit,
+      botConfigured: Boolean(telegramConfig.botToken),
+    });
+  });
+
+  // Admin Telegram Config endpoints
+  app.get("/api/admin/telegram-config", (_req, res) => {
+    res.json({
+      success: true,
+      config: telegramConfig,
+    });
+  });
+
+  app.post("/api/admin/telegram-config", (req, res) => {
+    const { botToken, botUsername, deliveryBotHandle, channel1Handle, channel1Url, channel2Handle, channel2Url, enforceOnEveryVisit, allowDevBypass } = req.body;
+    if (botToken !== undefined) telegramConfig.botToken = botToken.trim();
+    if (botUsername) (telegramConfig as any).botUsername = botUsername.trim().replace('@', '');
+    if (deliveryBotHandle) (telegramConfig as any).deliveryBotHandle = deliveryBotHandle.trim().replace('@', '');
+    if (channel1Handle) telegramConfig.channel1Handle = channel1Handle.trim();
+    if (channel1Url) telegramConfig.channel1Url = channel1Url.trim();
+    if (channel2Handle) telegramConfig.channel2Handle = channel2Handle.trim();
+    if (channel2Url) telegramConfig.channel2Url = channel2Url.trim();
+    if (enforceOnEveryVisit !== undefined) telegramConfig.enforceOnEveryVisit = Boolean(enforceOnEveryVisit);
+    if (allowDevBypass !== undefined) (telegramConfig as any).allowDevBypass = Boolean(allowDevBypass);
+    saveJsonFile("telegram_config.json", telegramConfig);
+
+    res.json({
+      success: true,
+      message: "Telegram settings updated successfully!",
+      config: telegramConfig,
+    });
+  });
+
+  // Automated Delivery Telegram Bot Webhook (For @PremiumVideoDeliveryBot)
+  app.post("/api/telegram/bot-webhook", async (req, res) => {
+    try {
+      const update = req.body;
+      const message = update?.message;
+      if (!message || !message.text) {
+        return res.json({ ok: true });
+      }
+
+      const chatId = message.chat?.id;
+      const text = message.text.trim();
+
+      // Check if start command: /start unlock_video-id or /start
+      if (text.startsWith("/start")) {
+        const token = telegramConfig.botToken || process.env.TELEGRAM_BOT_TOKEN;
+        const videoId = text.replace("/start unlock_", "").replace("/start", "").trim();
+        const foundVideo = (serverAdVideos || []).find((v: any) => v.id === videoId) || serverAdVideos?.[0];
+
+        if (token && chatId) {
+          const videoTitle = foundVideo ? foundVideo.title : "প্রিমিয়াম সিক্রেট ইনকাম ভিডিও";
+          const fullUrl = foundVideo ? foundVideo.fullVideoUrl : "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
+
+          await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: `🎉 *অভিনন্দন! আপনার ভিডিও আনলক হয়েছে*\n\n📹 *ভিডিও:* ${videoTitle}\n⏱️ *মেয়াদ:* ৯০ মিনিট\n\n⬇️ নিচের বোতামে চাপ দিয়ে সম্পূর্ণ ভিডিওটি উপভোগ করুন:\n\n⚠️ _এই ভিডিওটি সম্পূর্ণ সুরক্ষিত। ডাউনলোড বা শেয়ার করা সম্পূর্ণ নিষিদ্ধ।_`,
+              parse_mode: "Markdown",
+              protect_content: true,
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: "▶️ সম্পূর্ণ ভিডিও দেখুন", url: fullUrl }],
+                  [{ text: "🚀 আরও ভিডিও পেতে মিনি অ্যাপে যান", url: "https://t.me/CholoIncomeKoriBot" }],
+                ],
+              },
+            }),
+          }).catch(() => {});
+        }
+      }
+      return res.json({ ok: true });
+    } catch {
+      return res.json({ ok: true });
+    }
+  });
+
+  // Admin: Test Telegram Bot & Channel Administrator Status
+  app.post("/api/admin/telegram/test-bot", async (req, res) => {
+    try {
+      const token = req.body.botToken?.trim() || telegramConfig.botToken;
+      const ch1 = req.body.channel1Handle?.trim() || telegramConfig.channel1Handle;
+      const ch2 = req.body.channel2Handle?.trim() || telegramConfig.channel2Handle;
+
+      if (!token) {
+        return res.status(400).json({
+          success: false,
+          message: "⚠️ কোনো Telegram Bot Token পাওয়া যায়নি। অনুগ্রহ করে @BotFather থেকে বটের টোকেন দিন।",
+        });
+      }
+
+      // 1. Verify Bot Token
+      const botMeRes = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+      const botMe = await botMeRes.json();
+      if (!botMe.ok || !botMe.result) {
+        return res.status(400).json({
+          success: false,
+          message: `❌ অবৈধ Bot Token! Telegram থেকে পাওয়া ত্রুটি: ${botMe.description || 'Invalid token'}`,
+        });
+      }
+
+      const botInfo = botMe.result;
+      const botUsername = `@${botInfo.username}`;
+
+      // Helper to check channel and admin status
+      const checkChannel = async (channelHandle: string) => {
+        try {
+          // Check chat info
+          const chatRes = await fetch(`https://api.telegram.org/bot${token}/getChat?chat_id=${encodeURIComponent(channelHandle)}`);
+          const chatData = await chatRes.json();
+          if (!chatData.ok) {
+            return {
+              handle: channelHandle,
+              exists: false,
+              isAdmin: false,
+              title: null,
+              error: chatData.description || 'Channel not found or bot cannot access it',
+            };
+          }
+
+          // Check if bot is in chat administrators
+          const adminRes = await fetch(`https://api.telegram.org/bot${token}/getChatAdministrators?chat_id=${encodeURIComponent(channelHandle)}`);
+          const adminData = await adminRes.json();
+
+          let isAdmin = false;
+          if (adminData.ok && Array.isArray(adminData.result)) {
+            isAdmin = adminData.result.some((admin: any) => admin.user?.id === botInfo.id);
+          }
+
+          return {
+            handle: channelHandle,
+            exists: true,
+            isAdmin,
+            title: chatData.result.title || channelHandle,
+            memberCount: chatData.result.active_usernames ? null : undefined,
+          };
+        } catch (err: any) {
+          return {
+            handle: channelHandle,
+            exists: false,
+            isAdmin: false,
+            error: err.message,
+          };
+        }
+      };
+
+      const [status1, status2] = await Promise.all([
+        checkChannel(ch1),
+        checkChannel(ch2),
+      ]);
+
+      const bothAdmin = status1.isAdmin && status2.isAdmin;
+
+      return res.json({
+        success: true,
+        bot: {
+          id: botInfo.id,
+          name: botInfo.first_name,
+          username: botUsername,
+        },
+        channel1: status1,
+        channel2: status2,
+        allReady: bothAdmin,
+        summary: bothAdmin
+          ? `✅ চমৎকার! ${botUsername} উভয় চ্যানেলেই এডমিন হিসেবে সংযুক্ত আছে। এখন ব্যবহারকারী চ্যানেল থেকে লিভ নিলে স্বয়ংক্রিয়ভাবে ধরা পড়বে!`
+          : `⚠️ সতর্কতা: বট এখনও উভয় চ্যানেলে এডমিন নয়। টেলিগ্রাম চ্যানেলে গিয়ে বটকে (${botUsername}) "Administrator" হিসেবে অ্যাড করুন।`,
+      });
+    } catch (err: any) {
+      return res.status(500).json({
+        success: false,
+        message: `সার্ভার সংযোগ ত্রুটি: ${err.message}`,
+      });
+    }
+  });
+
+  // Recommended Telegram Bot Start Screen Description text
+  const defaultBotDescription = `🎉 স্বাগতম Cholo Income Kori 🥰
+প্রতিদিন আপনার অনলাইন ইনকামের যাত্রা শুরু হোক আমাদের সাথে!
+
+🔥 ৫ ভাবে নিশ্চিত ইনকাম:
+📺 Views ads - ভিডিও দেখে আয়
+🌐 Web visit - সাইট ভিজিট
+📢 Telegram task - চ্যানেলে জয়েন
+🎯 Mission task - স্পেশাল টাস্ক
+👥 Referral - ১০৳ ইনস্ট্যান্ট + ৫% আজীবন কমিশন!
+
+💳 সর্বনিম্ন উত্তোলন: ২৫ টাকা (বিকাশ, নগদ, Binance USDT)
+⚠️ ১০টি অ্যাড দেখার পর ১টি ক্লিক ও ১ মিনিট ভিজিট বাধ্যতামূলক।
+📢 চ্যানেল: @CholoIncomeKori
+💬 সাপোর্ট: @nabirmia`;
+
+  // Get recommended bot description
+  app.get("/api/telegram/bot-description", (_req, res) => {
+    res.json({
+      success: true,
+      description: defaultBotDescription,
+      shortDescription: "🎉 Cholo Income Kori - ৫ ভাবে নিশ্চিত ইনকাম, সর্বনিম্ন উত্তোলন ২৫৳!",
+    });
+  });
+
+  // Admin: Sync Description directly to Telegram Bot API (setMyDescription)
+  app.post("/api/admin/telegram/set-description", async (req, res) => {
+    try {
+      const token = req.body.botToken?.trim() || telegramConfig.botToken;
+      const description = (req.body.description?.trim()) || defaultBotDescription;
+
+      if (!token) {
+        return res.status(400).json({
+          success: false,
+          message: "⚠️ কোনো Telegram Bot Token পাওয়া যায়নি। অনুগ্রহ করে Settings বা Admin প্যানেলে Bot Token প্রদান করুন।",
+        });
+      }
+
+      // Call Telegram setMyDescription
+      const tgRes = await fetch(`https://api.telegram.org/bot${token}/setMyDescription`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description }),
+      });
+      const tgData = await tgRes.json();
+
+      if (!tgData.ok) {
+        return res.status(400).json({
+          success: false,
+          message: `Telegram ত্রুটি: ${tgData.description || 'বটের ডেসক্রিপশন সেট করতে ব্যর্থ হয়েছে'}`,
+        });
+      }
+
+      // Also set short description for bot profile
+      try {
+        await fetch(`https://api.telegram.org/bot${token}/setMyShortDescription`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            short_description: "🎉 Cholo Income Kori - ৫ ভাবে নিশ্চিত ইনকাম, সর্বনিম্ন উত্তোলন ২৫৳!",
+          }),
+        });
+      } catch {}
+
+      res.json({
+        success: true,
+        message: "✅ চমৎকার! Telegram Bot-এর 'Start Bot' বাটনের ওপরের খালি জায়গায় আপনার লেখাগুলো সফলভাবে সেট হয়েছে! এখন টেলিগ্রামে বটের চ্যাটে এটি সার্বক্ষণিক (All-time) প্রদর্শিত হবে।",
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        success: false,
+        message: `সার্ভার সংযোগ ত্রুটি: ${err.message}`,
+      });
+    }
+  });
+
+  // Telegram Channel Membership Verification endpoint (Detects Leaves in Real Time)
+  app.post("/api/telegram/verify-membership", async (req, res) => {
+    try {
+      const { telegramUserId, channel1Visited, channel2Visited } = req.body;
+      const botToken = telegramConfig.botToken || process.env.TELEGRAM_BOT_TOKEN;
+
+      const requiredChannels = [
+        telegramConfig.channel1Handle,
+        telegramConfig.channel2Handle,
+      ];
+
+      const cleanUserId = telegramUserId ? String(telegramUserId).trim().replace(/^@/, '') : '';
+      const isNumericId = /^\d+$/.test(cleanUserId);
+
+      // If Telegram Bot Token is configured
+      if (botToken) {
+        if (!isNumericId) {
+          return res.status(400).json({
+            success: false,
+            isMember: false,
+            message: '⚠️ আপনার টেলিগ্রাম নিউমেরিক ইউজার আইডি পাওয়া যায়নি। অনুগ্রহ করে টেলিগ্রাম অ্যাপের ভিতর থেকে মিনি অ্যাপটি ওপেন করুন।',
+          });
+        }
+
+        for (const ch of requiredChannels) {
+          try {
+            const url = `https://api.telegram.org/bot${botToken}/getChatMember?chat_id=${encodeURIComponent(ch)}&user_id=${encodeURIComponent(cleanUserId)}`;
+            const tgRes = await fetch(url);
+            const tgData = await tgRes.json();
+
+            if (tgData.ok && tgData.result) {
+              const status = tgData.result.status;
+              // Detect if user has LEFT or was KICKED
+              if (status === 'left' || status === 'kicked') {
+                return res.json({
+                  success: false,
+                  isMember: false,
+                  hasLeft: true,
+                  leftChannel: ch,
+                  message: `❌ আপনি ${ch} চ্যানেল থেকে লিভ (Leave) নিয়েছেন! অ্যাপে কাজ করতে হলে উভয় চ্যানেলে জয়েন থাকা বাধ্যতামূলক। পুনরায় জয়েন করুন।`
+                });
+              }
+
+              const isMember = ['member', 'administrator', 'creator'].includes(status) || 
+                               (status === 'restricted' && tgData.result.is_member === true);
+              if (!isMember) {
+                return res.json({
+                  success: false,
+                  isMember: false,
+                  hasLeft: false,
+                  leftChannel: ch,
+                  message: `❌ আপনি এখনও ${ch} চ্যানেলে জয়েন করেননি! দয়া করে চ্যানেলে জয়েন বাটনে চাপ দিয়ে জয়েন করুন।`
+                });
+              }
+            } else {
+              // Telegram Bot API returned an error
+              const desc = (tgData.description || '').toLowerCase();
+              if (desc.includes('bot is not a member') || desc.includes('chat not found') || desc.includes('unauthorized')) {
+                return res.json({
+                  success: false,
+                  isMember: false,
+                  hasLeft: false,
+                  message: `⚠️ টেলিগ্রাম কনফিগারেশন ত্রুটি: বটটি ${ch} চ্যানেলে অ্যাডমিন হিসেবে যুক্ত নেই! চ্যানেলে গিয়ে বটটিকে অ্যাডমিন করুন।`
+                });
+              }
+
+              // User not in channel
+              return res.json({
+                success: false,
+                isMember: false,
+                hasLeft: false,
+                leftChannel: ch,
+                message: `❌ আপনি ${ch} চ্যানেলে জয়েন করেননি! দয়া করে জয়েন বাটনে চাপ দিয়ে চ্যানেলে জয়েন করুন এবং তারপর যাচাই করুন।`
+              });
+            }
+          } catch (e: any) {
+            console.error(`Error verifying channel ${ch}:`, e);
+            return res.status(500).json({
+              success: false,
+              isMember: false,
+              message: `টেলিগ্রাম সার্ভারে সংযোগ করা সম্ভব হয়নি: ${e.message}`,
+            });
+          }
+        }
+
+        return res.json({
+          success: true,
+          isMember: true,
+          message: '✅ উভয় চ্যানেলে সক্রিয় সদস্যপদ সফলভাবে নিশ্চিত হয়েছে!'
+        });
+      }
+
+      // If Bot Token is not set in Admin Panel yet:
+      if ((telegramConfig as any).allowDevBypass && channel1Visited && channel2Visited) {
+        return res.json({
+          success: true,
+          isMember: true,
+          message: '✅ চ্যানেল মেম্বারশিপ যাচাই সফল হয়েছে (ডেভেলপার প্রিভিউ মোড)!'
+        });
+      }
+
+      return res.status(400).json({
+        success: false,
+        isMember: false,
+        hasLeft: false,
+        message: '⚠️ এডমিন প্যানেলে এখনও Telegram Bot Token সেট করা হয়নি। এডমিন প্যানেলের "Telegram & Channels" ট্যাব থেকে Bot Token প্রদান করুন ও বটকে উভয় চ্যানেলে অ্যাডমিন করুন।'
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, isMember: false, error: err?.message || 'Verification error' });
+    }
+  });
+
+  // Videos list
+  app.get("/api/videos", (_req, res) => {
+    res.json(serverVideos);
+  });
+
+  // Admin API: Stats & Overview
+  app.get("/api/admin/stats", (_req, res) => {
+    const userList = Object.values(usersMap);
+    const totalPaid = withdrawals
+      .filter((w) => w.status === "Approved")
+      .reduce((sum, item) => sum + item.amount, 0);
+    const pendingCount = withdrawals.filter((w) => w.status === "Pending").length;
+
+    res.json({
+      success: true,
+      stats: {
+        totalUsers: userList.length,
+        pendingWithdrawals: pendingCount,
+        totalPaidUsd: totalPaid.toFixed(2),
+        totalVideos: serverVideos.length,
+      },
+      users: userList,
+    });
+  });
+
+  // Admin API: Update Withdrawal status
+  app.post("/api/admin/withdrawals/update", (req, res) => {
+    const { id, status } = req.body;
+    const item = withdrawals.find((w) => w.id === id);
+    if (item) {
+      item.status = status;
+      saveJsonFile("withdrawals.json", withdrawals);
+      return res.json({ success: true, item });
+    }
+    res.status(404).json({ error: "Withdrawal not found" });
+  });
+
+  // Admin API: Delete Withdrawal record
+  app.post("/api/admin/withdrawals/delete", (req, res) => {
+    const { id } = req.body;
+    withdrawals = withdrawals.filter((w) => w.id !== id);
+    saveJsonFile("withdrawals.json", withdrawals);
+    res.json({ success: true, remaining: withdrawals.length });
+  });
+
+  // Admin API: Delete User account
+  app.post("/api/admin/users/delete", (req, res) => {
+    const { userId } = req.body;
+    if (!userId || userId === ADMIN_ID) {
+      return res.status(400).json({ error: "Cannot delete admin account" });
+    }
+    if (usersMap[userId]) {
+      delete usersMap[userId];
+      saveJsonFile("users.json", usersMap);
+      return res.json({ success: true, remaining: Object.keys(usersMap).length });
+    }
+    res.status(404).json({ error: "User not found" });
+  });
+
+  // Admin API: Update user balance and properties
+  app.post("/api/admin/users/update", (req, res) => {
+    const { userId, balanceUsd, dailyAdLimit, activeReferralsWithActivity } = req.body;
+    const targetUser = (userId && usersMap[userId]) ? usersMap[userId] : usersMap[ADMIN_ID];
+    if (targetUser) {
+      if (typeof balanceUsd === "number") {
+        targetUser.balanceUsd = +balanceUsd;
+      }
+      if (typeof dailyAdLimit === "number") {
+        targetUser.dailyAdLimit = dailyAdLimit;
+      }
+      if (typeof activeReferralsWithActivity === "number") {
+        targetUser.activeReferralsWithActivity = activeReferralsWithActivity;
+      }
+      saveJsonFile("users.json", usersMap);
+      return res.json({ success: true, user: targetUser });
+    }
+    return res.status(404).json({ error: "User not found" });
+  });
+
+  // Admin API: Add video task
+  app.post("/api/admin/videos/add", (req, res) => {
+    const { title, category, subCategory, rewardUsd, duration, thumbnail } = req.body;
+    const newVideo = {
+      id: "vid-" + Date.now(),
+      title: title || "New Earning Task",
+      category: category || "online-income",
+      subCategory: subCategory || "Telegram",
+      rewardUsd: parseFloat(rewardUsd) || 0.20,
+      duration: duration || "05:00",
+      thumbnail: thumbnail || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500",
+      isDemo: true,
+      views: 10,
+    };
+    serverVideos.unshift(newVideo as any);
+    saveJsonFile("videos.json", serverVideos);
+    res.json({ success: true, video: newVideo });
+  });
+
+  // Admin API: Edit video task
+  app.post("/api/admin/videos/edit", (req, res) => {
+    const { id, title, category, subCategory, rewardUsd, duration, thumbnail } = req.body;
+    const index = serverVideos.findIndex((v) => v.id === id);
+    if (index === -1) {
+      return res.status(404).json({ success: false, error: "ভিডিও টাস্ক পাওয়া যায়নি" });
+    }
+    serverVideos[index] = {
+      ...serverVideos[index],
+      title: title !== undefined ? title.trim() : serverVideos[index].title,
+      category: category || serverVideos[index].category,
+      subCategory: subCategory !== undefined ? subCategory.trim() : serverVideos[index].subCategory,
+      rewardUsd: rewardUsd !== undefined ? parseFloat(rewardUsd) || 0 : serverVideos[index].rewardUsd,
+      duration: duration !== undefined ? duration.trim() : serverVideos[index].duration,
+      thumbnail: thumbnail !== undefined ? thumbnail.trim() : serverVideos[index].thumbnail,
+    };
+    saveJsonFile("videos.json", serverVideos);
+    res.json({ success: true, video: serverVideos[index] });
+  });
+
+  // Admin API: Delete video task
+  app.post("/api/admin/videos/delete", (req, res) => {
+    const { id } = req.body;
+    serverVideos = serverVideos.filter((v) => v.id !== id);
+    saveJsonFile("videos.json", serverVideos);
+    res.json({ success: true, remaining: serverVideos.length });
+  });
+
+  // Admin API: Broadcast notification (Add, Edit, Update, Toggle)
+  app.post("/api/admin/broadcast", (req, res) => {
+    const { message, isActive } = req.body;
+    if (message !== undefined) {
+      noticesConfig.broadcastNotice.message = String(message).trim();
+      noticesConfig.broadcastNotice.updatedAt = new Date().toISOString();
+    }
+    if (isActive !== undefined) {
+      noticesConfig.broadcastNotice.isActive = Boolean(isActive);
+    }
+    saveJsonFile("notices.json", noticesConfig);
+    console.log(`[Admin Broadcast Updated]`, noticesConfig.broadcastNotice);
+    res.json({
+      success: true,
+      message: "ব্রডকাস্ট নোটিশ সফলভাবে আপডেট ও সেভ হয়েছে!",
+      broadcastNotice: noticesConfig.broadcastNotice,
+    });
+  });
+
+  // Admin API: Toggle Broadcast Notice Active Status
+  app.post("/api/admin/broadcast/toggle", (req, res) => {
+    const { isActive } = req.body;
+    noticesConfig.broadcastNotice.isActive = isActive !== undefined 
+      ? Boolean(isActive) 
+      : !noticesConfig.broadcastNotice.isActive;
+    saveJsonFile("notices.json", noticesConfig);
+    res.json({ success: true, broadcastNotice: noticesConfig.broadcastNotice });
+  });
+
+  // Admin API: Official Notice (View, Edit, Save)
+  app.post("/api/admin/official-notice", (req, res) => {
+    const { title, description, rules, warning, footer, isActive } = req.body;
+    if (title !== undefined) noticesConfig.officialNotice.title = String(title).trim();
+    if (description !== undefined) noticesConfig.officialNotice.description = String(description).trim();
+    if (Array.isArray(rules)) noticesConfig.officialNotice.rules = rules.map((r: any) => String(r).trim()).filter(Boolean);
+    if (warning !== undefined) noticesConfig.officialNotice.warning = String(warning).trim();
+    if (footer !== undefined) noticesConfig.officialNotice.footer = String(footer).trim();
+    if (isActive !== undefined) noticesConfig.officialNotice.isActive = Boolean(isActive);
+    noticesConfig.officialNotice.updatedAt = new Date().toISOString();
+    saveJsonFile("notices.json", noticesConfig);
+
+    res.json({
+      success: true,
+      message: "অফিসিয়াল নোটিশ সফলভাবে আপডেট ও সেভ হয়েছে!",
+      officialNotice: noticesConfig.officialNotice,
+    });
+  });
+
+  // Withdrawals
+  app.get("/api/withdrawals", (_req, res) => {
+    res.json(withdrawals);
+  });
+
+  app.post("/api/withdraw", (req, res) => {
+    const user = getRequestUser(req);
+    const { method, accountNumber, amount, currency } = req.body;
+    if (!method || !accountNumber || !amount) {
+      return res.status(400).json({ error: "Missing required withdrawal fields" });
+    }
+
+    const withdrawAmount = parseFloat(amount);
+    if (isNaN(withdrawAmount) || withdrawAmount <= 0) {
+      return res.status(400).json({ error: "সঠিক উত্তোলনের পরিমাণ লিখুন।" });
+    }
+
+    // Must be round figure (whole integer), poysa remains in balance
+    if (withdrawAmount % 1 !== 0) {
+      return res.status(400).json({
+        error: "উত্তোলনের পরিমাণ অবশ্যই পূর্ণসংখ্যা (Round Figure, যেমন: ২৫, ৫০, ১০০) হতে হবে। পয়সা আপনার অ্যাকাউন্টে জমা থাকবে।",
+      });
+    }
+
+    const minRequired = currency === 'USD' ? 1 : currency === 'BDT' ? 25 : 20;
+    if (withdrawAmount < minRequired) {
+      return res.status(400).json({
+        error: `সর্বনিম্ন উত্তোলন পরিমাণ ${currency === 'BDT' ? '৳২৫' : currency === 'INR' ? '₹২০' : '$১'} (পূর্ণসংখ্যা)`,
+      });
+    }
+
+    // Constraint: Must refer 3 active users (who completed at least ৳10 activity)
+    const activeRefs = user.activeReferralsWithActivity || 0;
+    if (activeRefs < 3) {
+      return res.status(400).json({
+        error: `টাকা উত্তোলন করতে হলে অন্তত ৩ জন সক্রিয় বন্ধুকে রেফার করতে হবে (যারা প্রত্যেকে ন্যূনতম ১০ টাকা কাজ করেছে)। বর্তমানে আপনার সক্রিয় রেফারেল: ${activeRefs}/৩ জন।`,
+      });
+    }
+
+    // Constraint: Duplicate account number prevention (1 account number = 1 unique user only)
+    const cleanAccount = accountNumber.trim().toLowerCase();
+    const isAccountUsedByAnother = withdrawals.some(
+      (w) => w.accountNumber.trim().toLowerCase() === cleanAccount && w.userId !== user.id
+    );
+    if (isAccountUsedByAnother) {
+      return res.status(400).json({
+        error: "এই অ্যাকাউন্ট নম্বরটি ইতিমধ্যে অন্য একজন ব্যবহারকারী ব্যবহার করেছেন! একটি নম্বর দিয়ে কেবল একটি অ্যাকাউন্টে পেমেন্ট নেওয়া যাবে।",
+      });
+    }
+
+    // Check whether this is user's first withdrawal
+    const userPreviousWithdrawals = withdrawals.filter((w) => w.userId === user.id);
+    const isFirstWithdrawal = userPreviousWithdrawals.length === 0;
+    const estimatedTime = isFirstWithdrawal ? "৭ থেকে ১৫ কার্যদিবস" : "৬ থেকে ১২ ঘণ্টা";
+
+    const newWithdrawal = {
+      id: "wth_" + Date.now(),
+      userId: user.id,
+      userName: user.displayName,
+      method,
+      accountNumber,
+      amount: withdrawAmount,
+      currency: currency || user.currency,
+      status: "Pending",
+      createdAt: new Date().toLocaleTimeString(),
+    };
+
+    withdrawals.unshift(newWithdrawal);
+    const deductUsd = currency === 'USD' ? withdrawAmount : withdrawAmount / 120;
+    user.balanceUsd = Math.max(0, +(Number(user.balanceUsd || 0) - deductUsd).toFixed(6));
+    saveJsonFile("withdrawals.json", withdrawals);
+    saveJsonFile("users.json", usersMap);
+
+    // Also add to live payouts
+    livePayouts.unshift({
+      id: "p-" + Date.now(),
+      userName: user.displayName,
+      amount: `${currency === 'BDT' ? '৳' : currency === 'INR' ? '₹' : '$'} ${withdrawAmount}`,
+      method,
+      timeAgo: "Just now",
+      status: "Processing",
+    });
+
+    res.json({ success: true, withdrawal: newWithdrawal, balanceUsd: user.balanceUsd });
+  });
+
+  app.get("/api/live-payouts", (_req, res) => {
+    res.json(livePayouts);
+  });
+
+  // Push Notifications Mock & Real sync
+  app.post("/api/notifications/subscribe", (req, res) => {
+    pushSubscriptions.push(req.body);
+    res.json({ success: true, message: "Subscribed to push notifications" });
+  });
+
+  // ==========================================
+  // AD-LOCKED VIDEOS & 90-MIN AUTO-EXPIRY APIS
+  // ==========================================
+
+  // Get ad-locked videos with current user's unlock & 90-min session status
+  app.get("/api/ad-videos", (req, res) => {
+    const user = getRequestUser(req);
+    const userId = (req.query.userId as string) || user.id;
+    const now = Date.now();
+
+    const sanitized = serverAdLockedVideos.map((video) => {
+      const sessionKey = `${userId}_${video.id}`;
+      const session = userVideoSessions[sessionKey];
+
+      let isUnlocked = false;
+      let remainingSeconds = 0;
+      let expiresAt: number | undefined = undefined;
+
+      if (session && session.unlocked && session.expiresAt) {
+        if (session.expiresAt > now) {
+          isUnlocked = true;
+          expiresAt = session.expiresAt;
+          remainingSeconds = Math.max(0, Math.floor((session.expiresAt - now) / 1000));
+        } else {
+          // 90 minutes expired! Auto-relock
+          session.unlocked = false;
+          session.adsWatched = 0;
+          session.expiresAt = undefined;
+        }
+      }
+
+      return {
+        id: video.id,
+        title: video.title,
+        description: video.description,
+        previewDuration: video.previewDuration,
+        fullDuration: video.fullDuration,
+        previewVideoUrl: video.previewVideoUrl,
+        fullVideoUrl: isUnlocked ? video.fullVideoUrl : null, // Hidden until 15 ads completed!
+        thumbnail: video.thumbnail,
+        requiredAds: video.requiredAds,
+        adTimerSeconds: video.adTimerSeconds || 15,
+        adNetworkUrl: video.adNetworkUrl,
+        adNetworkName: video.adNetworkName,
+        expiryMinutes: video.expiryMinutes || 90,
+        protectContent: video.protectContent ?? true,
+        deliveryBotHandle: video.deliveryBotHandle,
+        views: video.views || 0,
+        unlockedCount: video.unlockedCount || 0,
+        unlocked: isUnlocked,
+        adsWatched: session?.adsWatched || 0,
+        remainingSeconds,
+        expiresAt,
+      };
+    });
+
+    res.json(sanitized);
+  });
+
+  // Track ad watched progress for a video
+  app.post("/api/ad-videos/progress", (req, res) => {
+    const user = getRequestUser(req);
+    const { videoId } = req.body;
+    const userId = req.body.userId || user.id;
+
+    const video = serverAdLockedVideos.find((v) => v.id === videoId);
+    if (!video) {
+      return res.status(404).json({ error: "Video not found" });
+    }
+
+    const sessionKey = `${userId}_${videoId}`;
+    if (!userVideoSessions[sessionKey]) {
+      userVideoSessions[sessionKey] = {
+        videoId,
+        userId,
+        adsWatched: 0,
+        unlocked: false,
+      };
+    }
+
+    const session = userVideoSessions[sessionKey];
+    const now = Date.now();
+
+    // If already unlocked and still within 90 minutes
+    if (session.unlocked && session.expiresAt && session.expiresAt > now) {
+      return res.json({
+        success: true,
+        unlocked: true,
+        adsWatched: session.adsWatched,
+        requiredAds: video.requiredAds,
+        fullVideoUrl: video.fullVideoUrl,
+        expiresAt: session.expiresAt,
+        remainingSeconds: Math.floor((session.expiresAt - now) / 1000),
+      });
+    }
+
+    // Increment watched ads
+    session.adsWatched = (session.adsWatched || 0) + 1;
+
+    // Check if user completed required ads (e.g. 15 ads)
+    if (session.adsWatched >= video.requiredAds) {
+      session.unlocked = true;
+      session.unlockedAt = now;
+      const expiryMs = (video.expiryMinutes || 90) * 60 * 1000;
+      session.expiresAt = now + expiryMs;
+      video.unlockedCount = (video.unlockedCount || 0) + 1;
+
+      // Automatically post/upload full video to Telegram Channel for 90 minutes
+      const botToken = telegramConfig.botToken || process.env.TELEGRAM_BOT_TOKEN;
+      const targetChat = video.channelId || telegramConfig.channel1Handle || telegramConfig.channel2Handle;
+      let tgUploaded = false;
+      let tgMsgText = "";
+
+      if (botToken && targetChat) {
+        (async () => {
+          try {
+            const caption = `🎬 **${video.title}** (সম্পূর্ণ ফুল ভিডিও)\n\n⏱️ **এই ভিডিওটি আগামী ৯০ মিনিটের জন্য চ্যানেলে থাকবে এবং ৯০ মিনিট পর স্বয়ংক্রিয়ভাবে মুছে যাবে!**\n\n🛡️ *ডাউনলোড ও ফরওয়ার্ডিং নিষিদ্ধ (Protected Content)*`;
+            let uploadRes;
+
+            // Try sending as video first with protect_content: true
+            if (video.fullVideoUrl && !video.fullVideoUrl.includes('youtube') && !video.fullVideoUrl.includes('drive.google')) {
+              uploadRes = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  chat_id: targetChat,
+                  video: video.fullVideoUrl,
+                  caption,
+                  parse_mode: "Markdown",
+                  protect_content: true, // Native Telegram DRM protection!
+                  supports_streaming: true,
+                }),
+              });
+            }
+
+            if (!uploadRes || !uploadRes.ok) {
+              // Fallback to sending protected message with direct private link
+              uploadRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  chat_id: targetChat,
+                  text: `${caption}\n\n🔗 ফুল ভিডিও লিংক: ${video.fullVideoUrl}`,
+                  parse_mode: "Markdown",
+                  protect_content: true,
+                }),
+              });
+            }
+
+            const uploadData: any = await uploadRes.json();
+            if (uploadData.ok && uploadData.result?.message_id) {
+              const msgId = uploadData.result.message_id;
+              console.log(`[Telegram AutoUpload] Full video posted to ${targetChat}, msgId: ${msgId}. Scheduling deletion in 90m.`);
+              scheduledDeletions.push({
+                chatId: targetChat,
+                messageId: msgId,
+                deleteAt: now + expiryMs,
+                videoTitle: video.title,
+              });
+              saveJsonFile("scheduled_deletions.json", scheduledDeletions);
+            }
+          } catch (e: any) {
+            console.warn("[Telegram AutoUpload] Failed:", e.message);
+          }
+        })().catch(() => {});
+      }
+
+      saveJsonFile("ad_videos.json", serverAdLockedVideos);
+
+      return res.json({
+        success: true,
+        justUnlocked: true,
+        unlocked: true,
+        adsWatched: session.adsWatched,
+        requiredAds: video.requiredAds,
+        fullVideoUrl: video.fullVideoUrl,
+        expiresAt: session.expiresAt,
+        remainingSeconds: Math.floor(expiryMs / 1000),
+        message: `🎉 অভিনন্দন! ${video.requiredAds}টি অ্যাড সম্পন্ন হয়েছে। সম্পূর্ণ ভিডিওটি পরবর্তী ৯০ মিনিটের জন্য আনলক করা হয়েছে এবং চ্যানেলে ৯০ মিনিটের জন্য অটো-আপলোড হয়েছে!`,
+      });
+    }
+
+    res.json({
+      success: true,
+      justUnlocked: false,
+      unlocked: false,
+      adsWatched: session.adsWatched,
+      requiredAds: video.requiredAds,
+      remainingAds: video.requiredAds - session.adsWatched,
+      message: `অ্যাড সম্পন্ন হয়েছে! বাকি আছে ${video.requiredAds - session.adsWatched}টি অ্যাড।`,
+    });
+  });
+
+  // Increment video views
+  app.post("/api/ad-videos/view", (req, res) => {
+    const { videoId } = req.body;
+    const vid = serverAdLockedVideos.find((v) => v.id === videoId);
+    if (vid) {
+      vid.views = (vid.views || 0) + 1;
+    }
+    res.json({ success: true });
+  });
+
+  // Admin: Post Demo Video to Channel with 'Watch Full Video' inline button
+  app.post("/api/admin/ad-videos/post-demo-to-channel", async (req, res) => {
+    const { videoId, channelId } = req.body;
+    const vid = serverAdLockedVideos.find((v) => v.id === videoId);
+    if (!vid) return res.status(404).json({ error: "Video not found" });
+
+    const token = telegramConfig.botToken || process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) {
+      return res.status(400).json({ error: "Telegram Bot Token কনফিগার করা নেই। অনুগ্রহ করে প্রথমে বট টোকেন সেভ করুন।" });
+    }
+
+    const targetChannel = channelId || vid.channelId || telegramConfig.channel1Handle;
+    if (!targetChannel) {
+      return res.status(400).json({ error: "টার্গেট টেলিগ্রাম চ্যানেল হ্যান্ডেল বা আইডি পাওয়া যায়নি।" });
+    }
+
+    const botUsername = (telegramConfig.botUsername || "choloincome_bot").replace("@", "");
+    const miniAppDeepLink = `https://t.me/${botUsername}?startapp=video_${vid.id}`;
+
+    const caption = `🎥 **${vid.title}** (ফ্রি ডেমো ভিডিও)\n\n${vid.description}\n\n⏱️ ডেমো দৈর্ঘ্য: ${vid.previewDuration} | ফুল ভিডিও: ${vid.fullDuration}\n✨ ${vid.requiredAds}টি স্পন্সর বিজ্ঞাপন দেখলেই সম্পূর্ণ ফুল ভিডিওটি ৯০ মিনিটের জন্য আনলক হবে!\n\n👇 সম্পূর্ণ ভিডিও দেখতে নিচের বাটনে ক্লিক করুন:`;
+
+    const inlineKeyboard = {
+      inline_keyboard: [
+        [
+          {
+            text: "🎬 সম্পূর্ণ ভিডিও দেখুন (আনলক করুন)",
+            url: miniAppDeepLink,
+          },
+        ],
+      ],
+    };
+
+    try {
+      let tgRes;
+      if (vid.previewVideoUrl && !vid.previewVideoUrl.includes('youtube') && !vid.previewVideoUrl.includes('drive.google')) {
+        tgRes = await fetch(`https://api.telegram.org/bot${token}/sendVideo`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: targetChannel,
+            video: vid.previewVideoUrl,
+            caption,
+            parse_mode: "Markdown",
+            reply_markup: inlineKeyboard,
+          }),
+        });
+      }
+
+      if (!tgRes || !tgRes.ok) {
+        tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: targetChannel,
+            text: caption,
+            parse_mode: "Markdown",
+            reply_markup: inlineKeyboard,
+          }),
+        });
+      }
+
+      const data: any = await tgRes.json();
+      if (data.ok) {
+        const msgId = data.result?.message_id;
+        const cleanCh = targetChannel.replace("@", "");
+        const postUrl = targetChannel.startsWith("@") ? `https://t.me/${cleanCh}/${msgId}` : `https://t.me/${cleanCh}`;
+        vid.demoChannelUrl = postUrl;
+        vid.channelId = targetChannel;
+        saveJsonFile("ad_videos.json", serverAdLockedVideos);
+
+        return res.json({
+          success: true,
+          message: `✅ সফলভাবে '${targetChannel}'-এ ডেমো পোস্ট ও 'ফুল ভিডিও দেখুন' বাটন পাঠানো হয়েছে!`,
+          postUrl,
+          video: vid,
+        });
+      } else {
+        return res.status(400).json({ error: `টেলিগ্রাম ত্রুটি: ${data.description || 'চ্যানেলে পোস্ট পাঠানো যায়নি'}` });
+      }
+    } catch (err: any) {
+      return res.status(500).json({ error: `চ্যানেলে পোস্ট পাঠাতে ব্যর্থ: ${err.message}` });
+    }
+  });
+
+  // Admin: Add Ad-Locked Video
+  app.post("/api/admin/ad-videos/add", (req, res) => {
+    const newVid = {
+      id: "lock-vid-" + Date.now(),
+      title: req.body.title || "Untitled Video",
+      description: req.body.description || "",
+      previewDuration: req.body.previewDuration || "02:00",
+      fullDuration: req.body.fullDuration || "15:00",
+      previewVideoUrl: req.body.previewVideoUrl || "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+      fullVideoUrl: req.body.fullVideoUrl || "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+      thumbnail: req.body.thumbnail || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=70",
+      requiredAds: Number(req.body.requiredAds) || 15,
+      adTimerSeconds: Number(req.body.adTimerSeconds) || 15,
+      adNetworkUrl: req.body.adNetworkUrl || "https://monetag.com",
+      adNetworkName: req.body.adNetworkName || "Monetag Direct Link",
+      expiryMinutes: Number(req.body.expiryMinutes) || 90,
+      protectContent: req.body.protectContent ?? true,
+      deliveryBotHandle: req.body.deliveryBotHandle || "CholoIncome_Delivery_Bot",
+      demoChannelUrl: req.body.demoChannelUrl || "",
+      channelId: req.body.channelId || telegramConfig.channel1Handle || "",
+      views: 0,
+      unlockedCount: 0,
+    };
+    serverAdLockedVideos.unshift(newVid);
+    saveJsonFile("ad_videos.json", serverAdLockedVideos);
+
+    if (githubSyncConfig.token && githubSyncConfig.repo && githubSyncConfig.autoSyncOnChange) {
+      pushFileToGitHubDirect(
+        "data/ad_videos.json",
+        JSON.stringify(serverAdLockedVideos, null, 2),
+        `Admin: Add locked video "${newVid.title}"`
+      ).catch(() => {});
+    }
+
+    res.json({ success: true, video: newVid, allVideos: serverAdLockedVideos });
+  });
+
+  // Admin: Update Ad-Locked Video
+  app.post("/api/admin/ad-videos/update", (req, res) => {
+    const { id, ...updates } = req.body;
+    const idx = serverAdLockedVideos.findIndex((v) => v.id === id);
+    if (idx === -1) return res.status(404).json({ error: "Video not found" });
+
+    serverAdLockedVideos[idx] = { ...serverAdLockedVideos[idx], ...updates };
+    saveJsonFile("ad_videos.json", serverAdLockedVideos);
+
+    if (githubSyncConfig.token && githubSyncConfig.repo && githubSyncConfig.autoSyncOnChange) {
+      pushFileToGitHubDirect(
+        "data/ad_videos.json",
+        JSON.stringify(serverAdLockedVideos, null, 2),
+        `Admin: Update locked video "${serverAdLockedVideos[idx].title}"`
+      ).catch(() => {});
+    }
+
+    res.json({ success: true, video: serverAdLockedVideos[idx], allVideos: serverAdLockedVideos });
+  });
+
+  // Admin: Delete Ad-Locked Video
+  app.post("/api/admin/ad-videos/delete", (req, res) => {
+    const { id } = req.body;
+    serverAdLockedVideos = serverAdLockedVideos.filter((v) => v.id !== id);
+    saveJsonFile("ad_videos.json", serverAdLockedVideos);
+
+    if (githubSyncConfig.token && githubSyncConfig.repo && githubSyncConfig.autoSyncOnChange) {
+      pushFileToGitHubDirect(
+        "data/ad_videos.json",
+        JSON.stringify(serverAdLockedVideos, null, 2),
+        `Admin: Delete locked video (${serverAdLockedVideos.length} remaining)`
+      ).catch(() => {});
+    }
+
+    res.json({ success: true, allVideos: serverAdLockedVideos });
+  });
+
+  // ==========================================
+  // DIGITAL PACKAGES & STORE ORDERS APIS
+  // ==========================================
+
+  // Public: Get available store packages
+  app.get("/api/packages", (_req, res) => {
+    // Hide secret downloadUrl from public catalog; only provided upon purchase approval!
+    const catalog = serverPackages
+      .filter((p) => p.isActive)
+      .map((p) => ({
+        id: p.id,
+        title: p.title,
+        category: p.category,
+        description: p.description,
+        features: p.features,
+        priceBdt: p.priceBdt,
+        priceUsd: p.priceUsd,
+        thumbnail: p.thumbnail,
+        hashtags: p.hashtags || [],
+        fileSize: p.fileSize || "45 MB",
+        version: p.version || "v1.0",
+        requirements: p.requirements || "",
+        previewUrl: p.previewUrl || "",
+        salesCount: p.salesCount || 0,
+        isActive: p.isActive,
+      }));
+    res.json(catalog);
+  });
+
+  // User: Submit Package Purchase with Payment TrxID
+  app.post("/api/packages/purchase", (req, res) => {
+    const user = getRequestUser(req);
+    const { packageId, paymentMethod, senderAccount, transactionId, note } = req.body;
+    const userId = req.body.userId || user.id;
+    const userName = req.body.userName || user.displayName;
+    const userUsername = req.body.userUsername || user.username;
+
+    if (!packageId || !paymentMethod || !senderAccount || !transactionId) {
+      return res.status(400).json({ error: "অনুগ্রহ করে প্রেরক নম্বর ও ট্রানজেকশন আইডি প্রদান করুন।" });
+    }
+
+    const pkg = serverPackages.find((p) => p.id === packageId);
+    if (!pkg) {
+      return res.status(404).json({ error: "প্যাকেজটি পাওয়া যায়নি।" });
+    }
+
+    // Check for duplicate pending transaction ID
+    const cleanTrx = transactionId.trim().toUpperCase();
+    const isDuplicate = serverOrders.some(
+      (o) => o.transactionId.trim().toUpperCase() === cleanTrx && o.status !== "Rejected"
+    );
+    if (isDuplicate) {
+      return res.status(400).json({
+        error: "এই ট্রানজেকশন আইডি (TrxID) দিয়ে ইতিমধ্যে একটি অর্ডার সাবমিট করা হয়েছে!",
+      });
+    }
+
+    const newOrder = {
+      id: "ord_" + Date.now(),
+      userId,
+      userName,
+      userUsername,
+      packageId: pkg.id,
+      packageTitle: pkg.title,
+      packageCategory: pkg.category,
+      amountBdt: pkg.priceBdt,
+      amountUsd: pkg.priceUsd,
+      paymentMethod,
+      senderAccount: senderAccount.trim(),
+      transactionId: cleanTrx,
+      status: "Pending" as const,
+      createdAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + ", " + new Date().toLocaleDateString(),
+    };
+
+    serverOrders.unshift(newOrder);
+    saveJsonFile("orders.json", serverOrders);
+
+    res.json({
+      success: true,
+      order: newOrder,
+      message: `🎉 আপনার অর্ডারটি সফলভাবে জমা হয়েছে! এডমিন পেমেন্ট ভেরিফাই করে ৫-১৫ মিনিটের মধ্যে সফটওয়্যার/ভিডিও ডাউনলোড লিংক আনলক করে দিবে।`,
+    });
+  });
+
+  // User: Get customer's orders (with downloadUrl if approved)
+  app.get("/api/user/orders/:userId", (req, res) => {
+    const user = getRequestUser(req);
+    const userId = req.params.userId || user.id;
+    const userOrders = serverOrders.filter((o) => o.userId === userId);
+    res.json(userOrders);
+  });
+
+  // Admin: Get all packages (including secret download URLs)
+  app.get("/api/admin/packages", (_req, res) => {
+    res.json(serverPackages);
+  });
+
+  // Admin: Add Package
+  app.post("/api/admin/packages/add", (req, res) => {
+    // Process hashtags: support comma-separated string or array
+    let hashtags: string[] = [];
+    if (Array.isArray(req.body.hashtags)) {
+      hashtags = req.body.hashtags;
+    } else if (typeof req.body.hashtags === 'string') {
+      hashtags = req.body.hashtags
+        .split(/[,\s]+/)
+        .map((h: string) => h.trim())
+        .filter((h: string) => h.length > 0)
+        .map((h: string) => (h.startsWith('#') ? h : `#${h}`));
+    }
+
+    const newPkg = {
+      id: "pkg-" + Date.now(),
+      title: req.body.title || "New Digital Package",
+      category: req.body.category || "Software",
+      description: req.body.description || "",
+      features: Array.isArray(req.body.features)
+        ? req.body.features
+        : typeof req.body.features === 'string'
+        ? req.body.features.split('\n').filter((f: string) => f.trim().length > 0)
+        : ["প্রিমিয়াম ফিচার অন্তর্ভুক্ত"],
+      priceBdt: Number(req.body.priceBdt) || 450,
+      priceUsd: Number(req.body.priceUsd) || 3.75,
+      thumbnail: req.body.thumbnail || "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=500&auto=format&fit=crop&q=60",
+      downloadUrl: req.body.downloadUrl || "https://drive.google.com",
+      hashtags: hashtags.length > 0 ? hashtags : ['#Software', '#DigitalStore', '#VIP'],
+      fileSize: req.body.fileSize || "45 MB",
+      version: req.body.version || "v1.0",
+      requirements: req.body.requirements || "কম্পিউটার বা মোবাইল সাপোর্টেড",
+      previewUrl: req.body.previewUrl || "",
+      isActive: true,
+      salesCount: 0,
+    };
+    serverPackages.unshift(newPkg);
+    saveJsonFile("packages.json", serverPackages);
+
+    // Auto-commit to GitHub if configured
+    if (githubSyncConfig.token && githubSyncConfig.repo && githubSyncConfig.autoSyncOnChange) {
+      pushFileToGitHubDirect(
+        "data/packages.json",
+        JSON.stringify(serverPackages, null, 2),
+        `Admin: Add package "${newPkg.title}" (${serverPackages.length} packages)`
+      ).catch(() => {});
+    }
+
+    res.json({ success: true, package: newPkg, allPackages: serverPackages });
+  });
+
+  // Admin: Update Package
+  app.post("/api/admin/packages/update", (req, res) => {
+    const { id, ...updates } = req.body;
+    const idx = serverPackages.findIndex((p) => p.id === id);
+    if (idx === -1) return res.status(404).json({ error: "Package not found" });
+
+    // Format hashtags if updated
+    if (updates.hashtags && typeof updates.hashtags === 'string') {
+      updates.hashtags = updates.hashtags
+        .split(/[,\s]+/)
+        .map((h: string) => h.trim())
+        .filter((h: string) => h.length > 0)
+        .map((h: string) => (h.startsWith('#') ? h : `#${h}`));
+    }
+    if (updates.features && typeof updates.features === 'string') {
+      updates.features = updates.features.split('\n').filter((f: string) => f.trim().length > 0);
+    }
+
+    serverPackages[idx] = { ...serverPackages[idx], ...updates };
+    saveJsonFile("packages.json", serverPackages);
+
+    // Auto-commit to GitHub if configured
+    if (githubSyncConfig.token && githubSyncConfig.repo && githubSyncConfig.autoSyncOnChange) {
+      pushFileToGitHubDirect(
+        "data/packages.json",
+        JSON.stringify(serverPackages, null, 2),
+        `Admin: Update package "${serverPackages[idx].title}"`
+      ).catch(() => {});
+    }
+
+    res.json({ success: true, package: serverPackages[idx], allPackages: serverPackages });
+  });
+
+  // Admin: Delete Package
+  app.post("/api/admin/packages/delete", async (req, res) => {
+    const { id } = req.body;
+    if (id && !deletedPackageIds.includes(id)) {
+      deletedPackageIds.push(id);
+      saveJsonFile("deleted_package_ids.json", deletedPackageIds);
+    }
+    serverPackages = serverPackages.filter((p) => p.id !== id);
+    saveJsonFile("packages.json", serverPackages);
+
+    let githubPushed = false;
+    let githubMessage = "";
+
+    // Auto-commit to GitHub if configured
+    if (githubSyncConfig.token && githubSyncConfig.repo) {
+      try {
+        const ghRes = await pushFileToGitHubDirect(
+          "data/packages.json",
+          JSON.stringify(serverPackages, null, 2),
+          `Admin: Delete package (${serverPackages.length} packages remaining)`
+        );
+        githubPushed = ghRes.success;
+        githubMessage = ghRes.message;
+        // Also push deleted_package_ids.json
+        pushFileToGitHubDirect(
+          "data/deleted_package_ids.json",
+          JSON.stringify(deletedPackageIds, null, 2),
+          `Admin: Update deleted package IDs list`
+        ).catch(() => {});
+      } catch (err: any) {
+        githubMessage = err.message;
+      }
+    }
+
+    res.json({ success: true, allPackages: serverPackages, githubPushed, githubMessage });
+  });
+
+  // Admin: Bulk Save / Update All Packages (Microsoft Word style exact save)
+  app.post("/api/admin/packages/save-all", async (req, res) => {
+    const incomingPackages = req.body.packages;
+    if (!Array.isArray(incomingPackages)) {
+      return res.status(400).json({ error: "Invalid packages array" });
+    }
+
+    // Identify deleted packages and record their IDs so they never return
+    const incomingIds = new Set(incomingPackages.map((p) => p.id));
+    for (const oldPkg of serverPackages) {
+      if (!incomingIds.has(oldPkg.id) && !deletedPackageIds.includes(oldPkg.id)) {
+        deletedPackageIds.push(oldPkg.id);
+      }
+    }
+    saveJsonFile("deleted_package_ids.json", deletedPackageIds);
+
+    serverPackages = incomingPackages;
+    saveJsonFile("packages.json", serverPackages);
+
+    let githubPushed = false;
+    let githubMessage = "";
+
+    if (githubSyncConfig.token && githubSyncConfig.repo) {
+      try {
+        const ghRes = await pushFileToGitHubDirect(
+          "data/packages.json",
+          JSON.stringify(serverPackages, null, 2),
+          `Admin: Save & Update package catalog (${serverPackages.length} packages)`
+        );
+        githubPushed = ghRes.success;
+        githubMessage = ghRes.message;
+        pushFileToGitHubDirect(
+          "data/deleted_package_ids.json",
+          JSON.stringify(deletedPackageIds, null, 2),
+          `Admin: Update deleted package IDs list`
+        ).catch(() => {});
+      } catch (err: any) {
+        githubMessage = err.message;
+      }
+    }
+
+    res.json({
+      success: true,
+      allPackages: serverPackages,
+      githubPushed,
+      githubMessage: githubPushed
+        ? "✅ প্যাকেজ তালিকা সফলভাবে সেভ এবং GitHub-এ অটো-কমিট হয়েছে!"
+        : githubMessage || "প্যাকেজ সংরক্ষিত",
+    });
+  });
+
+  // Admin: Get all customer purchase orders
+  app.get("/api/admin/orders", (_req, res) => {
+    res.json(serverOrders);
+  });
+
+  // Admin: Approve or Reject Order
+  app.post("/api/admin/orders/update-status", (req, res) => {
+    const { orderId, status, rejectionReason } = req.body;
+    const order = serverOrders.find((o) => o.id === orderId);
+    if (!order) return res.status(404).json({ error: "Order not found" });
+
+    order.status = status;
+    if (status === "Approved") {
+      const pkg = serverPackages.find((p) => p.id === order.packageId);
+      if (pkg) {
+        order.downloadUrl = pkg.downloadUrl;
+        pkg.salesCount = (pkg.salesCount || 0) + 1;
+        saveJsonFile("packages.json", serverPackages);
+      }
+      order.approvedAt = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + ", " + new Date().toLocaleDateString();
+    } else if (status === "Rejected") {
+      order.rejectionReason = rejectionReason || "Invalid Transaction ID or unpaid";
+    }
+
+    saveJsonFile("orders.json", serverOrders);
+    res.json({ success: true, order, allOrders: serverOrders });
+  });
+
+  // Admin: Delete Order
+  app.post("/api/admin/orders/delete", (req, res) => {
+    const { orderId } = req.body;
+    if (!orderId) return res.status(400).json({ error: "Order ID required" });
+    serverOrders = serverOrders.filter((o) => o.id !== orderId);
+    saveJsonFile("orders.json", serverOrders);
+    res.json({ success: true, allOrders: serverOrders });
+  });
+
+  // Payment Numbers Configuration (bKash, Nagad, Rocket, Binance)
+  app.get("/api/payment-config", (_req, res) => {
+    res.json(serverPaymentConfig);
+  });
+
+  app.post("/api/admin/payment-config", (req, res) => {
+    serverPaymentConfig = {
+      ...serverPaymentConfig,
+      ...req.body,
+    };
+    saveJsonFile("payment_config.json", serverPaymentConfig);
+
+    // Auto-commit to GitHub if configured
+    if (githubSyncConfig.token && githubSyncConfig.repo && githubSyncConfig.autoSyncOnChange) {
+      pushFileToGitHubDirect(
+        "data/payment_config.json",
+        JSON.stringify(serverPaymentConfig, null, 2),
+        "Admin: Update payment numbers & bKash/Nagad config"
+      ).catch(() => {});
+    }
+
+    res.json({ success: true, config: serverPaymentConfig });
+  });
+
+  // ==========================================
+  // ADMIN DATABASE BACKUP, EXPORT & RESTORE APIS
+  // ==========================================
+
+  // Export full system snapshot as JSON
+  app.get("/api/admin/backup/export", (_req, res) => {
+    try {
+      const backup = {
+        success: true,
+        version: "2.0",
+        appName: "Cholo Income Kori",
+        exportedAt: new Date().toISOString(),
+        counts: {
+          users: Object.keys(usersMap).length,
+          packages: serverPackages.length,
+          orders: serverOrders.length,
+          withdrawals: withdrawals.length,
+          videos: serverVideos.length,
+          adVideos: serverAdLockedVideos.length,
+          tasks: serverTasks.length,
+        },
+        data: {
+          packages: serverPackages,
+          users: usersMap,
+          orders: serverOrders,
+          withdrawals: withdrawals,
+          videos: serverVideos,
+          adVideos: serverAdLockedVideos,
+          tasks: serverTasks,
+          paymentConfig: serverPaymentConfig,
+          incomeMethods: incomeMethodsConfig,
+          telegramConfig: telegramConfig,
+          notices: noticesConfig,
+        },
+      };
+
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="cholo_income_backup_${new Date().toISOString().slice(0, 10)}.json"`
+      );
+      res.setHeader("Content-Type", "application/json");
+      res.json(backup);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to generate backup: " + err.message });
+    }
+  });
+
+  // Download individual raw JSON file from /data
+  app.get("/api/admin/backup/file/:filename", (req, res) => {
+    try {
+      const allowedFiles = [
+        "packages.json",
+        "users.json",
+        "orders.json",
+        "withdrawals.json",
+        "videos.json",
+        "ad_videos.json",
+        "tasks.json",
+        "payment_config.json",
+        "income_methods_config.json",
+        "telegram_config.json",
+        "notices.json",
+      ];
+      const filename = req.params.filename;
+      if (!allowedFiles.includes(filename)) {
+        return res.status(400).json({ error: "Invalid file requested" });
+      }
+      const filePath = path.join(DATA_DIR, filename);
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: "File not found on server" });
+      }
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.sendFile(filePath);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Import / Restore backup JSON snapshot
+  app.post("/api/admin/backup/import", (req, res) => {
+    try {
+      const payload = req.body;
+      if (!payload || typeof payload !== "object") {
+        return res.status(400).json({ error: "Invalid backup JSON format" });
+      }
+
+      const data = payload.data || payload;
+      let restoredCount = 0;
+
+      if (data.packages && Array.isArray(data.packages)) {
+        serverPackages = data.packages;
+        saveJsonFile("packages.json", serverPackages);
+        restoredCount++;
+      }
+
+      if (data.users && typeof data.users === "object") {
+        usersMap = data.users;
+        saveJsonFile("users.json", usersMap);
+        restoredCount++;
+      }
+
+      if (data.orders && Array.isArray(data.orders)) {
+        serverOrders = data.orders;
+        saveJsonFile("orders.json", serverOrders);
+        restoredCount++;
+      }
+
+      if (data.withdrawals && Array.isArray(data.withdrawals)) {
+        withdrawals = data.withdrawals;
+        saveJsonFile("withdrawals.json", withdrawals);
+        restoredCount++;
+      }
+
+      if (data.videos && Array.isArray(data.videos)) {
+        serverVideos = data.videos;
+        saveJsonFile("videos.json", serverVideos);
+        restoredCount++;
+      }
+
+      if (data.adVideos && Array.isArray(data.adVideos)) {
+        serverAdLockedVideos = data.adVideos;
+        saveJsonFile("ad_videos.json", serverAdLockedVideos);
+        restoredCount++;
+      }
+
+      if (data.tasks && Array.isArray(data.tasks)) {
+        serverTasks = data.tasks;
+        saveJsonFile("tasks.json", serverTasks);
+        restoredCount++;
+      }
+
+      if (data.paymentConfig && typeof data.paymentConfig === "object") {
+        serverPaymentConfig = { ...serverPaymentConfig, ...data.paymentConfig };
+        saveJsonFile("payment_config.json", serverPaymentConfig);
+        restoredCount++;
+      }
+
+      if (data.incomeMethods && typeof data.incomeMethods === "object") {
+        incomeMethodsConfig = { ...incomeMethodsConfig, ...data.incomeMethods };
+        saveJsonFile("income_methods_config.json", incomeMethodsConfig);
+        restoredCount++;
+      }
+
+      if (data.telegramConfig && typeof data.telegramConfig === "object") {
+        telegramConfig = { ...telegramConfig, ...data.telegramConfig };
+        saveJsonFile("telegram_config.json", telegramConfig);
+        restoredCount++;
+      }
+
+      if (data.notices && typeof data.notices === "object") {
+        noticesConfig = { ...noticesConfig, ...data.notices };
+        saveJsonFile("notices.json", noticesConfig);
+        restoredCount++;
+      }
+
+      res.json({
+        success: true,
+        message: `✅ সম্পূর্ণ ব্যাকআপ ডাটা সফলভাবে রিস্টোর হয়েছে! (${restoredCount}টি ডাটাবেজ মডিউল আপডেট করা হয়েছে)`,
+        counts: {
+          packages: serverPackages.length,
+          users: Object.keys(usersMap).length,
+          orders: serverOrders.length,
+          withdrawals: withdrawals.length,
+          videos: serverVideos.length,
+          adVideos: serverAdLockedVideos.length,
+        },
+      });
+    } catch (err: any) {
+      console.error("[Backup Import Error]:", err);
+      res.status(500).json({ error: "Failed to restore backup: " + err.message });
+    }
+  });
+
+  // Auto-sync & Intelligent Merge endpoint:
+  // Merges client-side vault data into live server without deleting existing packages or users.
+  app.post("/api/admin/backup/auto-sync", (req, res) => {
+    try {
+      const payload = req.body;
+      if (!payload || typeof payload !== "object") {
+        return res.status(400).json({ error: "Invalid auto-sync payload" });
+      }
+
+      const data = payload.data || payload;
+      let addedPackages = 0;
+      let updatedUsers = 0;
+
+      // 1. Packages: Merge by id and title without resurrecting deleted items
+      if (Array.isArray(data.packages) && data.packages.length > 0) {
+        for (const incomingPkg of data.packages) {
+          if (!incomingPkg || !incomingPkg.id) continue;
+          if (deletedPackageIds.includes(incomingPkg.id)) continue; // NEVER resurrect deleted packages!
+          const existingIdx = serverPackages.findIndex(
+            (p) => p.id === incomingPkg.id || (p.title && p.title.trim().toLowerCase() === incomingPkg.title?.trim().toLowerCase())
+          );
+          if (existingIdx === -1) {
+            // Only add if server has 0 packages (e.g. initial disaster recovery)
+            if (serverPackages.length === 0) {
+              serverPackages.push(incomingPkg);
+              addedPackages++;
+            }
+          } else {
+            serverPackages[existingIdx] = {
+              ...serverPackages[existingIdx],
+              ...incomingPkg,
+              salesCount: Math.max(serverPackages[existingIdx].salesCount || 0, incomingPkg.salesCount || 0),
+            };
+          }
+        }
+        saveJsonFile("packages.json", serverPackages);
+      }
+
+      // 2. Users: Merge into usersMap
+      if (data.users && typeof data.users === "object") {
+        for (const [uid, uObj] of Object.entries(data.users)) {
+          if (!uObj || typeof uObj !== "object") continue;
+          if (!usersMap[uid]) {
+            usersMap[uid] = uObj;
+            updatedUsers++;
+          } else {
+            const existing = usersMap[uid];
+            usersMap[uid] = {
+              ...existing,
+              ...uObj,
+              balanceBdt: Math.max(existing.balanceBdt || 0, (uObj as any).balanceBdt || 0),
+              balanceUsd: Math.max(existing.balanceUsd || 0, (uObj as any).balanceUsd || 0),
+            };
+          }
+        }
+        saveJsonFile("users.json", usersMap);
+      }
+
+      // 3. Orders: Merge by id
+      if (Array.isArray(data.orders) && data.orders.length > 0) {
+        for (const o of data.orders) {
+          if (!o || !o.id) continue;
+          if (!serverOrders.some((existing) => existing.id === o.id)) {
+            serverOrders.unshift(o);
+          }
+        }
+        saveJsonFile("orders.json", serverOrders);
+      }
+
+      // 4. Payment Config: Merge numbers if provided
+      if (data.paymentConfig && typeof data.paymentConfig === "object") {
+        serverPaymentConfig = {
+          ...serverPaymentConfig,
+          ...data.paymentConfig,
+        };
+        saveJsonFile("payment_config.json", serverPaymentConfig);
+      }
+
+      // 5. Income methods, telegramConfig, notices
+      if (data.incomeMethods && typeof data.incomeMethods === "object") {
+        incomeMethodsConfig = { ...data.incomeMethods, ...incomeMethodsConfig };
+        saveJsonFile("income_methods_config.json", incomeMethodsConfig);
+      }
+      if (data.telegramConfig && typeof data.telegramConfig === "object") {
+        telegramConfig = { ...data.telegramConfig, ...telegramConfig };
+        saveJsonFile("telegram_config.json", telegramConfig);
+      }
+      if (data.notices && typeof data.notices === "object") {
+        noticesConfig = { ...data.notices, ...noticesConfig };
+        saveJsonFile("notices.json", noticesConfig);
+      }
+
+      console.log(`[Auto-Sync] Merged successfully: +${addedPackages} packages, +${updatedUsers} users`);
+
+      res.json({
+        success: true,
+        message: "✅ অটো-সিঙ্ক সম্পন্ন! প্যাকেজ ও ইউজার ডাটা অক্ষত রাখা হয়েছে।",
+        addedPackages,
+        updatedUsers,
+        counts: {
+          packages: serverPackages.length,
+          users: Object.keys(usersMap).length,
+          orders: serverOrders.length,
+        },
+      });
+    } catch (err: any) {
+      console.error("[Auto-Sync Error]:", err);
+      res.status(500).json({ error: "Auto-sync failed: " + err.message });
+    }
+  });
+
+  // ==================== GITHUB AUTO-SYNC & AUTO-COMMIT ENDPOINTS ====================
+  // 1. Get GitHub sync configuration
+  app.get("/api/admin/github-sync/config", (_req, res) => {
+    res.json({
+      success: true,
+      repo: githubSyncConfig.repo,
+      branch: githubSyncConfig.branch || "main",
+      hasToken: !!githubSyncConfig.token,
+      maskedToken: githubSyncConfig.token
+        ? githubSyncConfig.token.slice(0, 4) + "••••••••" + githubSyncConfig.token.slice(-4)
+        : "",
+      autoSyncOnChange: githubSyncConfig.autoSyncOnChange !== false,
+      lastSyncedAt: githubSyncConfig.lastSyncedAt,
+      lastStatus: githubSyncConfig.lastStatus,
+    });
+  });
+
+  // 2. Save GitHub sync configuration
+  app.post("/api/admin/github-sync/config", (req, res) => {
+    try {
+      const { repo, branch, token, autoSyncOnChange } = req.body;
+      if (typeof repo === "string") {
+        githubSyncConfig.repo = repo.replace(/^https?:\/\/github\.com\//, "").replace(/\/$/, "").trim();
+      }
+      if (typeof branch === "string" && branch.trim()) {
+        githubSyncConfig.branch = branch.trim();
+      }
+      if (typeof token === "string" && token.trim()) {
+        githubSyncConfig.token = token.trim();
+      }
+      if (typeof autoSyncOnChange === "boolean") {
+        githubSyncConfig.autoSyncOnChange = autoSyncOnChange;
+      }
+      githubSyncConfig.lastStatus = "কনফিগারেশন সংরক্ষিত";
+      saveJsonFile("github_sync_config.json", githubSyncConfig);
+
+      res.json({
+        success: true,
+        message: "GitHub সিঙ্ক কনফিগারেশন সফলভাবে সেভ হয়েছে!",
+        config: {
+          repo: githubSyncConfig.repo,
+          branch: githubSyncConfig.branch,
+          hasToken: !!githubSyncConfig.token,
+          autoSyncOnChange: githubSyncConfig.autoSyncOnChange,
+        },
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: "সেটিংস সেভ ব্যর্থ: " + e.message });
+    }
+  });
+
+  // 3. Test GitHub connection
+  app.post("/api/admin/github-sync/test", async (req, res) => {
+    try {
+      const repoToTest = (req.body.repo || githubSyncConfig.repo || "").replace(/^https?:\/\/github\.com\//, "").replace(/\/$/, "").trim();
+      const tokenToTest = (req.body.token || githubSyncConfig.token || "").trim();
+
+      if (!repoToTest) {
+        return res.status(400).json({ error: "GitHub Repository নাম (যেমন: username/repo) দিন।" });
+      }
+      if (!tokenToTest) {
+        return res.status(400).json({ error: "GitHub Personal Access Token দিন।" });
+      }
+
+      const resp = await fetch(`https://api.github.com/repos/${repoToTest}`, {
+        headers: {
+          Authorization: `Bearer ${tokenToTest}`,
+          Accept: "application/vnd.github.v3+json",
+          "User-Agent": "CholoIncomeBot-AdminSync/1.0",
+        },
+      });
+      const data: any = await resp.json().catch(() => ({}));
+
+      if (resp.ok) {
+        return res.json({
+          success: true,
+          message: `✅ GitHub কানেকশন সফল! রিপোজিটরি: ${data.full_name} (${data.private ? "Private" : "Public"})`,
+          repoName: data.full_name,
+          defaultBranch: data.default_branch,
+          permissions: data.permissions,
+        });
+      } else {
+        const errorDetail = data.message || resp.statusText;
+        return res.status(resp.status).json({
+          success: false,
+          error: `❌ সংযোগ ব্যর্থ (${resp.status}): ${errorDetail}`,
+        });
+      }
+    } catch (err: any) {
+      return res.status(500).json({ error: "GitHub সার্ভারের সাথে সংযোগ করা যায়নি: " + err.message });
+    }
+  });
+
+  // 4. Force push all data files directly to GitHub repository
+  app.post("/api/admin/github-sync/push", async (_req, res) => {
+    try {
+      if (!githubSyncConfig.token || !githubSyncConfig.repo) {
+        return res.status(400).json({
+          error: "GitHub Repository এবং Access Token কনফিগার করা নেই। অনুগ্রহ করে প্রথমে সেটিংস সেভ করুন।",
+        });
+      }
+
+      const filesToPush = [
+        { path: "data/packages.json", content: JSON.stringify(serverPackages, null, 2), desc: `প্যাকেজ তালিকা (${serverPackages.length}টি)` },
+        { path: "data/deleted_package_ids.json", content: JSON.stringify(deletedPackageIds, null, 2), desc: "মুছে ফেলা প্যাকেজ তালিকা" },
+        { path: "data/ad_videos.json", content: JSON.stringify(serverAdLockedVideos, null, 2), desc: `লকড ভিডিও তালিকা (${serverAdLockedVideos.length}টি)` },
+        { path: "data/tasks.json", content: JSON.stringify(serverTasks, null, 2), desc: `ইনকাম টাস্ক তালিকা (${serverTasks.length}টি)` },
+        { path: "data/payment_config.json", content: JSON.stringify(serverPaymentConfig, null, 2), desc: "বিকাশ/নগদ পেমেন্ট নম্বর" },
+        { path: "data/income_methods_config.json", content: JSON.stringify(incomeMethodsConfig, null, 2), desc: "ইনকাম মেথড ও রেট" },
+        { path: "data/telegram_config.json", content: JSON.stringify(telegramConfig, null, 2), desc: "টেলিগ্রাম সেটিংস" },
+        { path: "data/notices.json", content: JSON.stringify(noticesConfig, null, 2), desc: "নোটিশ কনফিগ" },
+        { path: "data/users.json", content: JSON.stringify(usersMap, null, 2), desc: `ইউজার একাউন্ট (${Object.keys(usersMap).length}টি)` },
+      ];
+
+      const results = [];
+      let successCount = 0;
+
+      for (const f of filesToPush) {
+        const result = await pushFileToGitHubDirect(
+          f.path,
+          f.content,
+          `Admin Auto-Sync: Update ${f.path} [${new Date().toLocaleString("en-US", { timeZone: "Asia/Dhaka" })}]`
+        );
+        results.push({ file: f.path, desc: f.desc, success: result.success, message: result.message });
+        if (result.success) successCount++;
+      }
+
+      githubSyncConfig.lastSyncedAt = new Date().toISOString();
+      githubSyncConfig.lastStatus = `✅ ${successCount}/${filesToPush.length}টি ফাইল গিটহাবে অটো-কমিট সম্পন্ন`;
+      saveJsonFile("github_sync_config.json", githubSyncConfig);
+
+      res.json({
+        success: successCount > 0,
+        successCount,
+        totalCount: filesToPush.length,
+        message: successCount === filesToPush.length
+          ? "🎉 দারুণ! আপনার সকল ডাটা ফাইল সরাসরি GitHub-এ অটো-কমিট হয়ে গেছে!"
+          : `⚠️ ${successCount}/${filesToPush.length}টি ফাইল গিটহাবে পুশ হয়েছে।`,
+        results,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: "গিটহাব অটো-পুশ ব্যর্থ: " + err.message });
+    }
+  });
+
+  // Vite middleware for development
+  if (process.env.NODE_ENV !== "production") {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), "dist");
+    app.use(express.static(distPath));
+    app.get("*", (_req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
+    });
+  }
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://0.0.0.0:${PORT}`);
+
+    // Anti-Sleep / 24/7 Keep-Alive Background Service for Render
+    const renderUrl = process.env.RENDER_EXTERNAL_URL || process.env.APP_URL;
+    if (renderUrl) {
+      console.log(`[Anti-Sleep] Initializing Keep-Alive pings to ${renderUrl} every 10 minutes`);
+      setInterval(() => {
+        try {
+          fetch(`${renderUrl}/api/health`)
+            .then((r) => r.json())
+            .then(() => console.log(`[Anti-Sleep] Pinged ${renderUrl} successfully at ${new Date().toISOString()}`))
+            .catch((err) => console.warn(`[Anti-Sleep] Ping warning:`, err.message));
+        } catch (e: any) {
+          console.warn(`[Anti-Sleep] Ping execution error:`, e.message);
+        }
+      }, 10 * 60 * 1000); // every 10 mins (before Render's 15 min sleep threshold)
+    }
+  });
+}
+
+startServer();

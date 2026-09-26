@@ -1,0 +1,33 @@
+{
+  "ads": {
+    "enabled": true,
+    "rewardBdt": 1.5,
+    "rewardUsd": 0.0125,
+    "dailyLimit": 40,
+    "directAdUrl": "https://omg10.com/4/11869572"
+  },
+  "webVisit": {
+    "enabled": true,
+    "rewardBdt": 3.0,
+    "rewardUsd": 0.025
+  },
+  "telegram": {
+    "enabled": true,
+    "rewardBdt": 5.0,
+    "rewardUsd": 0.0416
+  },
+  "mission": {
+    "enabled": true,
+    "rewardBdt": 10.0,
+    "rewardUsd": 0.0833
+  },
+  "referral": {
+    "enabled": true,
+    "bonusBdt": 10.0,
+    "bonusUsd": 0.0833,
+    "commissionPercent": 5,
+    "minActiveReferralsForWithdraw": 3,
+    "minIncomeForActiveReferralBdt": 10.0,
+    "minWithdrawBdt": 25.0
+  }
+}

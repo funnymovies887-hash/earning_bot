@@ -1,0 +1,112 @@
+[
+  {
+    "id": "vid-1",
+    "title": "Adsterra Auto Traffic Bot",
+    "category": "online-income",
+    "subCategory": "Adsterra",
+    "thumbnail": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60",
+    "duration": "04:15",
+    "rewardUsd": 0.15,
+    "isDemo": true,
+    "views": 1420
+  },
+  {
+    "id": "vid-2",
+    "title": "টেলিগ্রাম গ্রুপ অনলাইন ইনকাম",
+    "category": "online-income",
+    "subCategory": "Telegram",
+    "thumbnail": "https://images.unsplash.com/photo-1616469829941-c7200edec809?w=500&auto=format&fit=crop&q=60",
+    "duration": "06:30",
+    "rewardUsd": 0.20,
+    "isDemo": true,
+    "views": 3890
+  },
+  {
+    "id": "vid-3",
+    "title": "Adsterra Live payment proof",
+    "category": "online-income",
+    "subCategory": "Adsterra",
+    "thumbnail": "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=500&auto=format&fit=crop&q=60",
+    "duration": "05:40",
+    "rewardUsd": 0.18,
+    "isDemo": true,
+    "views": 5210
+  },
+  {
+    "id": "vid-4",
+    "title": "স্মৃতি মার্কেটিং করে টেলিগ্রাম",
+    "category": "online-income",
+    "subCategory": "পেইড মার্কেটিং",
+    "thumbnail": "https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=500&auto=format&fit=crop&q=60",
+    "duration": "07:12",
+    "rewardUsd": 0.25,
+    "isDemo": true,
+    "views": 2980
+  },
+  {
+    "id": "vid-5",
+    "title": "Telegram Bot থেকে দৈনিক আয়",
+    "category": "online-income",
+    "subCategory": "Telegram",
+    "thumbnail": "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=500&auto=format&fit=crop&q=60",
+    "duration": "03:55",
+    "rewardUsd": 0.15,
+    "isDemo": true,
+    "views": 6140
+  },
+  {
+    "id": "vid-6",
+    "title": "স্মার্ট আর্নিং সিস্টেম এ টু জেড",
+    "category": "online-income",
+    "subCategory": "Monitag",
+    "thumbnail": "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=500&auto=format&fit=crop&q=60",
+    "duration": "08:20",
+    "rewardUsd": 0.30,
+    "isDemo": true,
+    "views": 4720
+  },
+  {
+    "id": "vid-7",
+    "title": "পেইড মার্কেটিং করে ইনকাম",
+    "category": "online-income",
+    "subCategory": "পেইড মার্কেটিং",
+    "thumbnail": "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=500&auto=format&fit=crop&q=60",
+    "duration": "09:05",
+    "rewardUsd": 0.25,
+    "isDemo": true,
+    "views": 3340
+  },
+  {
+    "id": "vid-8",
+    "title": "লাইভ Adsterra পেমেন্ট প্রুফ",
+    "category": "online-income",
+    "subCategory": "Adsterra",
+    "thumbnail": "https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=500&auto=format&fit=crop&q=60",
+    "duration": "05:15",
+    "rewardUsd": 0.20,
+    "isDemo": true,
+    "views": 7420
+  },
+  {
+    "id": "vid-9",
+    "title": "Movie Trailer: Secret Agent 007",
+    "category": "movies-clips",
+    "subCategory": "Viral Video",
+    "thumbnail": "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500&auto=format&fit=crop&q=60",
+    "duration": "02:45",
+    "rewardUsd": 0.12,
+    "isDemo": true,
+    "views": 8900
+  },
+  {
+    "id": "vid-10",
+    "title": "Viral Comedy Scene Best Clips",
+    "category": "movies-clips",
+    "subCategory": "Viral Video",
+    "thumbnail": "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500&auto=format&fit=crop&q=60",
+    "duration": "03:10",
+    "rewardUsd": 0.15,
+    "isDemo": true,
+    "views": 12050
+  }
+]
