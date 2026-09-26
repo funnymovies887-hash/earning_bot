@@ -1,5 +1,21 @@
 [
   {
+    "id": "task-1790401487215-ip36",
+    "title": "hgi",
+    "category": "visit",
+    "subCategory": "Adsterra Direct Link",
+    "destinationUrl": "https://researchingsweatexit.com/uuvpnv8xx0?key=107822578742d87fb11b32d1a788560f",
+    "mediaType": "link",
+    "rewardBdt": 0.13,
+    "rewardUsd": 0.001083,
+    "timerSeconds": 60,
+    "instructions": "hj",
+    "isHot": true,
+    "isActive": true,
+    "createdAt": "2026-09-26",
+    "totalCompletions": 0
+  },
+  {
     "id": "task-ad-1",
     "title": "Adsterra হাই-সিপিএম ভিডিও বিজ্ঞাপন ১",
     "category": "ads",
@@ -31,7 +47,7 @@
     "isHot": false,
     "isActive": true,
     "createdAt": "2026-09-02",
-    "totalCompletions": 0
+    "totalCompletions": 1
   },
   {
     "id": "task-visit-1",
