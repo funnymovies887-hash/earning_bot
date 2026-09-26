@@ -10,10 +10,9 @@ import {
   CheckCircle2,
   Send,
   RotateCcw,
-  Check,
-  Eye,
   Film,
   Zap,
+  Eye,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { AdLockedVideo, UserProfile } from '../types';
@@ -41,9 +40,9 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
   const [remainingExpireSeconds, setRemainingExpireSeconds] = useState<number>(0);
   const [isExpired, setIsExpired] = useState(false);
 
-  // Active watching ad modal/timer
+  // Active watching ad modal/timer matching Monetag In-App style
   const [isWatchingAd, setIsWatchingAd] = useState(false);
-  const [adCountdown, setAdCountdown] = useState(15);
+  const [adCountdown, setAdCountdown] = useState(6);
   const [canClaimAd, setCanClaimAd] = useState(false);
   const [isAdSubmitting, setIsAdSubmitting] = useState(false);
 
@@ -103,12 +102,12 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
     return () => clearInterval(timer);
   }, [isDelivered, remainingExpireSeconds]);
 
-  // Active Ad Countdown Timer
+  // Active Ad Countdown Timer (Fast 6s or custom seconds)
   useEffect(() => {
     if (!isWatchingAd) return;
 
     setCanClaimAd(false);
-    const targetSeconds = video?.adTimerSeconds || 15;
+    const targetSeconds = Math.min(video?.adTimerSeconds || 6, 15);
     setAdCountdown(targetSeconds);
 
     const timer = setInterval(() => {
@@ -128,7 +127,6 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
   if (!isOpen || !video) return null;
 
   const requiredAds = video.requiredAds || 1;
-  const timerSeconds = video.adTimerSeconds || 15;
   const isAdsComplete = adsWatched >= requiredAds;
 
   // Format 90-minute countdown into MM:SS
@@ -151,9 +149,8 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
     }
   };
 
-  // Handle Watch Demo in Inbox (Demo Video Channel)
+  // Handle Watch Demo in Inbox (Top Button)
   const handleWatchDemoInInbox = () => {
-    // Priority: specific post link -> channel url -> default demo channel
     const targetUrl =
       video.previewVideoUrl && video.previewVideoUrl.includes('t.me')
         ? video.previewVideoUrl
@@ -161,7 +158,7 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
     openTelegramLinkSafe(targetUrl);
   };
 
-  // Start watching an ad
+  // Start watching an ad (opens Monetag screen)
   const handleStartWatchAd = () => {
     setIsWatchingAd(true);
     try {
@@ -170,7 +167,7 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
     } catch {}
   };
 
-  // Complete ad step and sync with backend
+  // Claim Ad Step when countdown is 0
   const handleClaimAdStep = async () => {
     if (!canClaimAd || isAdSubmitting) return;
     setIsAdSubmitting(true);
@@ -191,7 +188,7 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
           confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
           setStatusNotification({
             type: 'success',
-            text: '🎉 বিজ্ঞাপন দেখা সম্পন্ন হয়েছে! এবার নিচের "Send Inbox" বাটনে ক্লিক করুন।',
+            text: '🎉 বিজ্ঞাপন দেখা সম্পন্ন হয়েছে! এবার নিচের নীল বাটনে ক্লিক করে ইনবক্সে ফুল ভিডিও নিন।',
           });
         } else {
           setIsWatchingAd(false);
@@ -202,7 +199,6 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
         }
       }
     } catch {
-      // Fallback
       const next = adsWatched + 1;
       setAdsWatched(next);
       setIsWatchingAd(false);
@@ -211,7 +207,7 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
     }
   };
 
-  // User clicks "Send Inbox": Bot uploads full video to demo video channel
+  // User clicks "Send Inbox": Bot uploads video and IMMEDIATELY opens Telegram channel
   const handleSendInbox = async () => {
     if (isSendingToChannel) return;
     setIsSendingToChannel(true);
@@ -232,18 +228,26 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
         setRemainingExpireSeconds(data.remainingSeconds || 90 * 60);
         setIsExpired(false);
 
-        // Haptic feedback & Confetti
+        // Haptic feedback
         try {
           (window as any).Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
         } catch {}
+
         confetti({ particleCount: 140, spread: 90, origin: { y: 0.55 } });
 
         setStatusNotification({
           type: 'success',
-          text: data.message || '✅ সম্পূর্ণ ফুল ভিডিওটি টেলিগ্রাম চ্যানেলে সফলভাবে আপলোড হয়েছে!',
+          text: data.message || '✅ ফুল ভিডিও চ্যানেলে আপলোড হয়েছে!',
         });
 
         if (onUnlockSuccess) onUnlockSuccess(video.id);
+
+        // INSTANT REDIRECT: Immediately open the Telegram Channel so user has ZERO wait!
+        if (data.postUrl) {
+          setTimeout(() => {
+            openTelegramLinkSafe(data.postUrl);
+          }, 350);
+        }
       } else {
         setStatusNotification({
           type: 'error',
@@ -269,51 +273,51 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
           if (e.target === e.currentTarget) onClose();
         }}
       >
+        {/* Modal Container: Yellow / Gold Telegram Theme as requested by user */}
         <motion.div
           initial={{ opacity: 0, scale: 0.94, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.94, y: 15 }}
           id="ad-locked-video-container"
-          className="bg-slate-950 border border-purple-500/40 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[92vh] text-white relative select-none"
+          className="bg-gradient-to-b from-[#fef08a] via-[#fde047] to-[#eab308] border-2 border-amber-400 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[94vh] text-slate-900 relative select-none"
         >
-          {/* Header */}
-          <div className="p-3 px-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
+          {/* Top Header */}
+          <div className="p-3 px-4 bg-amber-400/90 border-b border-amber-500/50 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-purple-500 animate-pulse" />
-              <span className="text-xs font-black tracking-wide text-purple-200 uppercase">
-                প্রিমিয়াম ভিডিও মেথড
+              <span className="w-2.5 h-2.5 rounded-full bg-slate-900 animate-pulse" />
+              <span className="text-xs font-black tracking-wide text-slate-900 uppercase">
+                🎁 স্পেশাল আনলক ভিডিও
               </span>
             </div>
 
             <button
               onClick={onClose}
-              className="w-7 h-7 rounded-full bg-slate-800 hover:bg-slate-700 active:scale-90 text-slate-300 flex items-center justify-center transition-all cursor-pointer"
+              className="w-7 h-7 rounded-full bg-amber-500 hover:bg-amber-600 active:scale-90 text-slate-900 flex items-center justify-center transition-all cursor-pointer font-bold shadow-xs"
               title="বন্ধ করুন"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Hero Thumbnail Banner Card (No in-app video player as requested) */}
-          <div className="relative aspect-[16/9] w-full bg-slate-900 overflow-hidden">
+          {/* Hero Thumbnail Banner Card (No in-app player) */}
+          <div className="relative aspect-[16/9] w-full bg-slate-900 overflow-hidden border-b-2 border-amber-400">
             <img
               src={video.thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=70'}
               alt={video.title}
               className="w-full h-full object-cover"
             />
-            {/* Dark gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />
 
             {/* Badges on Thumbnail */}
             <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
-              <span className="px-2 py-0.5 rounded-md bg-purple-600/90 text-white font-extrabold text-[10px] shadow-md backdrop-blur-xs flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-amber-300" />
+              <span className="px-2 py-0.5 rounded-md bg-amber-500 text-slate-950 font-black text-[10px] shadow-md flex items-center gap-1">
+                <Sparkles className="w-3 h-3 fill-slate-950" />
                 <span>প্রাইভেট মেথড</span>
               </span>
             </div>
 
             <div className="absolute top-2.5 right-2.5">
-              <span className="px-2 py-0.5 rounded-md bg-rose-600/90 text-white font-black text-[10px] shadow-md backdrop-blur-xs flex items-center gap-1">
+              <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white font-black text-[10px] shadow-md flex items-center gap-1">
                 <Clock className="w-3 h-3" />
                 <span>৯০ মি. অটো-ডিলিট</span>
               </span>
@@ -321,27 +325,27 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
 
             {/* Duration Badges at bottom of image */}
             <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between text-[11px] font-black text-white">
-              <span className="bg-black/80 px-2 py-0.5 rounded-md backdrop-blur-xs border border-white/10 flex items-center gap-1">
-                <Film className="w-3 h-3 text-purple-400" />
+              <span className="bg-black/80 px-2 py-0.5 rounded-md backdrop-blur-xs border border-white/20 flex items-center gap-1">
+                <Film className="w-3 h-3 text-amber-300" />
                 <span>ডেমো: {video.previewDuration || '02:00'}</span>
               </span>
 
-              <span className="bg-amber-500/90 text-slate-950 px-2 py-0.5 rounded-md shadow-sm font-bold flex items-center gap-1">
+              <span className="bg-amber-400 text-slate-950 px-2 py-0.5 rounded-md shadow-sm font-black flex items-center gap-1">
                 <Zap className="w-3 h-3 fill-slate-950" />
-                <span>ফুল ভিডিও: {video.fullDuration || '18:40'}</span>
+                <span>ফুল: {video.fullDuration || '18:40'}</span>
               </span>
             </div>
           </div>
 
-          {/* Modal Content Body */}
-          <div className="p-4 space-y-3.5 overflow-y-auto flex-1 bg-slate-950">
+          {/* Modal Content Body on Yellow Canvas */}
+          <div className="p-4 space-y-3 overflow-y-auto flex-1 bg-amber-50/70">
             {/* Title & Description */}
             <div>
-              <h3 className="text-base font-black text-white leading-snug">
+              <h3 className="text-base font-black text-slate-900 leading-snug">
                 {video.title}
               </h3>
               {video.description && (
-                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                <p className="text-xs text-slate-700 mt-1 leading-relaxed font-medium">
                   {video.description}
                 </p>
               )}
@@ -349,33 +353,33 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
 
             {/* 3 Info Badges Grid */}
             <div className="grid grid-cols-3 gap-2">
-              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-2 text-center">
-                <span className="text-[10px] text-slate-400 block font-medium">প্রয়োজনীয় এডস</span>
-                <span className="text-xs font-black text-amber-400">{requiredAds} টি</span>
+              <div className="bg-white/90 border border-amber-300 rounded-xl p-2 text-center shadow-xs">
+                <span className="text-[10px] text-slate-600 block font-bold">প্রয়োজনীয় এডস</span>
+                <span className="text-xs font-black text-amber-600">{requiredAds} টি</span>
               </div>
-              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-2 text-center">
-                <span className="text-[10px] text-slate-400 block font-medium">লাইভ থাকবে</span>
-                <span className="text-xs font-black text-rose-400">{video.expiryMinutes || 90} মিনিট</span>
+              <div className="bg-white/90 border border-amber-300 rounded-xl p-2 text-center shadow-xs">
+                <span className="text-[10px] text-slate-600 block font-bold">লাইভ থাকবে</span>
+                <span className="text-xs font-black text-rose-600">{video.expiryMinutes || 90} মিনিট</span>
               </div>
-              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-2 text-center">
-                <span className="text-[10px] text-slate-400 block font-medium">সুরক্ষা (DRM)</span>
-                <span className="text-xs font-black text-emerald-400">নো-ডাউনলোড</span>
+              <div className="bg-white/90 border border-amber-300 rounded-xl p-2 text-center shadow-xs">
+                <span className="text-[10px] text-slate-600 block font-bold">সুরক্ষা</span>
+                <span className="text-xs font-black text-emerald-600">নো-ডাউনলোড</span>
               </div>
             </div>
 
             {/* Status Notifications */}
             {statusNotification && (
               <div
-                className={`p-2.5 rounded-xl text-xs font-bold flex items-center gap-2 border ${
+                className={`p-2.5 rounded-xl text-xs font-bold flex items-center gap-2 border shadow-xs ${
                   statusNotification.type === 'success'
-                    ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-200'
-                    : 'bg-rose-950/80 border-rose-500/50 text-rose-200'
+                    ? 'bg-emerald-100 border-emerald-400 text-emerald-900'
+                    : 'bg-rose-100 border-rose-400 text-rose-900'
                 }`}
               >
                 {statusNotification.type === 'success' ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 ) : (
-                  <X className="w-4 h-4 text-rose-400 shrink-0" />
+                  <X className="w-4 h-4 text-rose-600 shrink-0" />
                 )}
                 <span>{statusNotification.text}</span>
               </div>
@@ -383,237 +387,232 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
 
             {/* If Delivered & Active in Telegram Channel */}
             {isDelivered && !isExpired && (
-              <div className="bg-gradient-to-r from-emerald-950/90 to-teal-950/90 border border-emerald-500/60 rounded-2xl p-3.5 space-y-2">
+              <div className="bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-3 space-y-1.5 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                    <span className="text-xs font-extrabold text-emerald-300">চ্যানেলে ফুল ভিডিও আপলোড হয়েছে</span>
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+                    <span className="text-xs font-black text-emerald-900">ফুল ভিডিও চ্যানেলে আপলোড হয়েছে!</span>
                   </div>
-                  <span className="text-[11px] font-black px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-400/40">
+                  <span className="text-[11px] font-black px-2 py-0.5 rounded-md bg-emerald-200 text-emerald-900">
                     ⏱ {formatExpiryTime(remainingExpireSeconds)} বাকি
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-300 leading-relaxed">
-                  বট দ্বারা @demovideos24 চ্যানেলে সম্পূর্ণ ফুল ভিডিওটি আপলোড করা হয়েছে। Telegram DRM সুরক্ষার কারণে ভিডিওটি কেউ ডাউনলোড বা ফরওয়ার্ড করতে পারবে না। ৯০ মিনিট পর স্বয়ংক্রিয়ভাবে চ্যানেল থেকে মুছে যাবে।
+                <p className="text-[11px] text-slate-700 leading-relaxed font-medium">
+                  বট দ্বারা @demovideos24 চ্যানেলে ভিডিওটি আপলোড করা হয়েছে। ডাউনলোড বা ফরওয়ার্ড করা যাবে না। ৯০ মিনিট পর স্বয়ংক্রিয়ভাবে মুছে যাবে।
                 </p>
-                <div className="pt-1 flex items-center justify-between text-[10px] text-emerald-400 font-semibold border-t border-emerald-800/40">
-                  <span className="flex items-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5" /> DRM Protected
-                  </span>
-                  <span>Auto-delete after 90m</span>
-                </div>
               </div>
             )}
 
-            {/* If 90-Minute Expired */}
+            {/* If Expired */}
             {isExpired && (
-              <div className="bg-rose-950/70 border border-rose-800/60 rounded-2xl p-3 text-center space-y-1.5">
-                <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-rose-300">
+              <div className="bg-rose-50 border border-rose-300 rounded-2xl p-2.5 text-center space-y-1">
+                <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-rose-700">
                   <RotateCcw className="w-3.5 h-3.5" />
-                  <span>৯০ মিনিটের সময়সীমা শেষ হয়েছে</span>
+                  <span>৯০ মিনিটের মেয়াদ শেষ হয়েছে</span>
                 </div>
-                <p className="text-[11px] text-slate-300">
-                  চ্যানেল থেকে ভিডিওটি অটোমেটিক ডিলিট হয়ে গেছে। পুনরায় ফুল ভিডিও পেতে বিজ্ঞাপন দেখুন।
-                </p>
+                <p className="text-[11px] text-slate-600">ভিডিওটি চ্যানেল থেকে স্বয়ংক্রিয়ভাবে ডিলিট হয়ে গেছে।</p>
               </div>
             )}
 
             {/* Ad Progress Bar */}
             {!isDelivered && (
-              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 space-y-2">
-                <div className="flex items-center justify-between text-xs font-black">
-                  <span className="text-slate-300 flex items-center gap-1.5">
-                    <Eye className="w-3.5 h-3.5 text-purple-400" />
-                    বিজ্ঞাপন দেখার অগ্রগতি:
+              <div className="bg-white/90 border border-amber-300 rounded-2xl p-3 space-y-2 shadow-xs">
+                <div className="flex items-center justify-between text-xs font-black text-slate-900">
+                  <span className="flex items-center gap-1.5">
+                    <Eye className="w-3.5 h-3.5 text-amber-600" />
+                    বিজ্ঞাপন অগ্রগতি:
                   </span>
-                  <span className={isAdsComplete ? 'text-emerald-400' : 'text-amber-400'}>
+                  <span className={isAdsComplete ? 'text-emerald-600' : 'text-amber-700'}>
                     {adsWatched} / {requiredAds} সম্পন্ন
                   </span>
                 </div>
 
-                <div className="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden border border-slate-700">
+                <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden border border-slate-300">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
-                      isAdsComplete
-                        ? 'bg-gradient-to-r from-emerald-500 to-green-400'
-                        : 'bg-gradient-to-r from-amber-500 to-orange-500'
+                      isAdsComplete ? 'bg-emerald-500' : 'bg-gradient-to-r from-amber-400 to-amber-600'
                     }`}
                     style={{ width: `${Math.min(100, (adsWatched / requiredAds) * 100)}%` }}
                   />
                 </div>
 
-                {/* Status Notice text */}
-                <p className="text-[11px] text-slate-400 leading-normal">
+                <p className="text-[11px] text-slate-600 font-medium">
                   {isAdsComplete
-                    ? '✅ বিজ্ঞাপন দেখা শেষ! এবার নিচে থাকা "Send Inbox" বাটনে ক্লিক করলে বট চ্যানেলে ফুল ভিডিওটি আপলোড করবে।'
-                    : `ভিডিওটি আনলক করতে আর ${Math.max(0, requiredAds - adsWatched)}টি স্পন্সর বিজ্ঞাপন দেখতে হবে।`}
+                    ? '✅ বিজ্ঞাপন শেষ! নিচের নীল বাটনে ক্লিক করলেই বট চ্যানেলে ফুল ভিডিও আপলোড করবে।'
+                    : `ফুল ভিডিও পেতে আর ${Math.max(0, requiredAds - adsWatched)}টি স্পন্সর বিজ্ঞাপন দেখুন।`}
                 </p>
               </div>
             )}
           </div>
 
-          {/* Action Buttons Footer matching user instructions */}
-          <div className="p-3.5 bg-slate-900 border-t border-slate-800 flex flex-col gap-2.5">
-            {/* Primary Action Button based on state */}
+          {/* Action Buttons Footer: WATCH DEMO ON TOP, WATCH FULL VIDEO ON BOTTOM (Exact User Request) */}
+          <div className="p-4 bg-amber-400/90 border-t border-amber-500/50 flex flex-col gap-2.5">
+            {/* 1. TOP BUTTON: Watch Demo in Inbox (ওপরে) */}
+            <button
+              id="watch-demo-inbox-top-btn"
+              type="button"
+              onClick={handleWatchDemoInInbox}
+              className="w-full py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black text-sm shadow-md flex items-center justify-center gap-2 active:scale-98 transition-all cursor-pointer border border-slate-700"
+            >
+              <Film className="w-4 h-4 text-amber-300" />
+              <span>Watch Demo in Inbox (ইনবক্সে ডেমো ভিডিও দেখুন)</span>
+              <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+
+            {/* 2. BOTTOM BUTTON: Watch Full Video / Send Inbox (নিচে, ছবিতে থাকা হুবহু Vibrant Telegram Blue রঙ!) */}
             {isDelivered && !isExpired ? (
-              /* State 1: Already Delivered -> Open in Telegram Channel */
               <button
                 type="button"
                 onClick={() => {
                   const targetUrl = channelPostUrl || 'https://t.me/demovideos24';
                   openTelegramLinkSafe(targetUrl);
                 }}
-                className="w-full py-3 px-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 rounded-2xl text-white font-black text-sm shadow-xl flex items-center justify-center gap-2 active:scale-98 transition-all cursor-pointer animate-pulse"
+                className="w-full py-3.5 px-4 bg-[#007aff] hover:bg-[#0069d9] active:scale-98 rounded-2xl text-white font-black text-sm shadow-xl flex items-center justify-center gap-2 transition-all cursor-pointer animate-pulse"
               >
                 <Play className="w-4 h-4 fill-white" />
                 <span>চ্যানেলে সম্পূর্ণ ফুল ভিডিও দেখুন (Open in Channel)</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </button>
             ) : isAdsComplete ? (
-              /* State 2: Ads Finished -> Send Inbox Button */
               <button
-                id="send-inbox-btn"
+                id="send-inbox-bottom-btn"
                 type="button"
                 disabled={isSendingToChannel}
                 onClick={handleSendInbox}
-                className="w-full py-3.5 px-4 bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-2xl font-black text-sm shadow-2xl flex items-center justify-center gap-2 active:scale-98 transition-all cursor-pointer animate-bounce"
+                className="w-full py-4 px-4 bg-[#007aff] hover:bg-[#0069d9] active:scale-98 text-white rounded-2xl font-black text-base shadow-2xl flex items-center justify-center gap-2 transition-all cursor-pointer animate-bounce"
               >
                 <Send className="w-4 h-4" />
                 <span>
                   {isSendingToChannel
                     ? 'বট চ্যানেলে ভিডিও আপলোড করছে...'
-                    : 'ইনবক্সে পাঠান (Send Inbox) 🚀'}
+                    : 'ইনবক্সে ফুল ভিডিও পাঠান (Send Inbox) 🚀'}
                 </span>
               </button>
             ) : (
-              /* State 3: Ads Pending -> Watch Ad Button */
               <button
-                id="watch-ad-btn"
+                id="watch-ad-bottom-btn"
                 type="button"
                 onClick={handleStartWatchAd}
-                className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-sm rounded-2xl shadow-xl flex items-center justify-center gap-2 active:scale-98 transition-all cursor-pointer"
+                className="w-full py-3.5 px-4 bg-[#007aff] hover:bg-[#0069d9] active:scale-98 text-white font-black text-sm rounded-2xl shadow-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
               >
-                <Play className="w-4 h-4 fill-slate-950" />
+                <Play className="w-4 h-4 fill-white" />
                 <span>
-                  বিজ্ঞাপন দেখুন ({adsWatched + 1}/{requiredAds}) - {timerSeconds}s
+                  বিজ্ঞাপন দেখুন ({adsWatched + 1}/{requiredAds}) - Watch Ad
                 </span>
               </button>
             )}
-
-            {/* Secondary Action: Watch Demo in Inbox (Always Available) */}
-            <button
-              id="watch-demo-inbox-btn"
-              type="button"
-              onClick={handleWatchDemoInInbox}
-              className="w-full py-2.5 px-4 bg-slate-800/90 hover:bg-slate-700/90 text-purple-300 hover:text-white border border-purple-500/30 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 active:scale-98 transition-all cursor-pointer"
-            >
-              <Film className="w-3.5 h-3.5 text-purple-400" />
-              <span>Watch Demo in Inbox (ইনবক্সে ডেমো ভিডিও দেখুন)</span>
-              <ExternalLink className="w-3 h-3 text-purple-400" />
-            </button>
           </div>
 
-          {/* Interactive In-App Ad Watcher & Strict Countdown Gate Modal */}
+          {/* Interactive In-App Ad Watcher Screen - EXACTLY Matching photo_2026-09-26_17-39-34.jpg! */}
           <AnimatePresence>
             {isWatchingAd && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute inset-0 z-50 bg-slate-950/98 backdrop-blur-md p-5 flex flex-col justify-between"
+                className="absolute inset-0 z-50 bg-[#9fd94f] p-4 flex flex-col justify-between overflow-y-auto select-none"
+                style={{
+                  backgroundImage: `radial-gradient(#8ec93f 15%, transparent 16%)`,
+                  backgroundSize: '16px 16px',
+                }}
               >
-                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-                    <span className="text-xs font-bold text-amber-300">
-                      স্পন্সর বিজ্ঞাপন ভেরিফিকেশন (#{adsWatched + 1}/{requiredAds})
-                    </span>
-                  </div>
+                {/* Purple Top Navbar as in Screenshot */}
+                <div className="-m-4 mb-2 p-3 bg-[#7c3aed] text-white flex items-center justify-between shadow-md">
                   <button
                     onClick={() => setIsWatchingAd(false)}
-                    className="w-6 h-6 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer"
+                    className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/20 cursor-pointer"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="w-5 h-5 text-white" />
                   </button>
+                  <div className="flex items-center gap-1.5 font-black text-sm">
+                    <span>🎁 Smart Earning 💸</span>
+                  </div>
+                  <div className="w-7 h-7" />
                 </div>
 
-                <div className="py-6 flex flex-col items-center justify-center text-center space-y-4">
-                  {/* Circular Timer Visual */}
-                  <div className="relative w-28 h-28 flex items-center justify-center">
-                    <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="42"
-                        className="text-slate-800 stroke-current"
-                        strokeWidth="8"
-                        fill="transparent"
-                      />
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="42"
-                        className="text-purple-500 stroke-current transition-all duration-1000"
-                        strokeWidth="8"
-                        strokeDasharray={264}
-                        strokeDashoffset={264 - (264 * (timerSeconds - adCountdown)) / timerSeconds}
-                        strokeLinecap="round"
-                        fill="transparent"
-                      />
-                    </svg>
+                {/* Top Center Timer Badge (00:06 format as in photo) */}
+                <div className="flex justify-center my-1">
+                  <div className="bg-black/30 backdrop-blur-xs text-white font-mono font-bold text-xs px-3.5 py-1 rounded-full shadow-sm">
+                    00:0{adCountdown}
+                  </div>
+                </div>
 
-                    <div className="absolute flex flex-col items-center justify-center">
-                      <span className="text-3xl font-black text-white">{adCountdown}</span>
-                      <span className="text-[10px] text-purple-300 uppercase tracking-wider font-bold">সেকেন্ড</span>
+                {/* Center Creative Ad Card matching photo */}
+                <div className="bg-white rounded-3xl overflow-hidden shadow-2xl border border-white/40 my-2">
+                  <div className="relative aspect-[4/3] bg-gradient-to-br from-indigo-900 via-purple-900 to-blue-900 flex items-center justify-center overflow-hidden p-4">
+                    {/* Game / Ton Visual Illustration */}
+                    <div className="relative w-full h-full flex flex-col items-center justify-center text-center">
+                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-200 border-2 border-white flex items-center justify-center shadow-xl mb-2">
+                        <span className="text-2xl font-black text-blue-950">💎</span>
+                      </div>
+                      <span className="bg-amber-400 text-slate-950 px-3 py-1 rounded-full font-black text-xs uppercase tracking-wider shadow-md">
+                        PLAY GAMES EARN TON
+                      </span>
+                    </div>
+
+                    <div className="absolute top-3 left-3 bg-blue-600/90 text-white text-[10px] font-black px-2 py-0.5 rounded-lg border border-white/30">
+                      Hun Fun Box
+                    </div>
+                    <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-blue-500/90 text-white flex items-center justify-center font-bold text-xs">
+                      TON
                     </div>
                   </div>
 
-                  <div>
-                    <h4 className="font-extrabold text-sm text-white">
-                      {canClaimAd ? '✅ বিজ্ঞাপন দেখা সফল হয়েছে!' : 'স্পন্সর ওয়েবসাইট ওপেন হয়েছে...'}
+                  {/* Headline & Body */}
+                  <div className="p-4 space-y-1">
+                    <h4 className="text-base font-black text-slate-900">
+                      Your Wallet. Your TON.
                     </h4>
-                    <p className="text-xs text-slate-300 mt-1 max-w-xs leading-relaxed">
-                      {canClaimAd
-                        ? 'নিচের বাটনে ক্লিক করে বিজ্ঞাপন সম্পন্ন করুন এবং পরবর্তী ধাপে যান।'
-                        : `কাউন্টডাউন শূন্য (${timerSeconds}s) হওয়া পর্যন্ত অপেক্ষা করুন।`}
+                    <p className="text-xs text-slate-600 font-medium">
+                      Straight to your wallet. No deposit, no KYC.
                     </p>
+                    <div className="flex items-center justify-between pt-2">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-6 h-6 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">
+                          🎮
+                        </div>
+                        <span className="text-[11px] font-bold text-slate-800">Hun Fun Box</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-medium">Ad</span>
+                    </div>
                   </div>
-
-                  {/* Open ad again button if popup was blocked */}
-                  {!canClaimAd && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        window.open(video.adNetworkUrl || 'https://omg10.com/4/11882677', '_blank', 'noopener,noreferrer');
-                      }}
-                      className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      স্পন্সর লিংক পুনরায় ওপেন করুন
-                    </button>
-                  )}
                 </div>
 
-                <div className="pt-3 border-t border-slate-800">
+                {/* Badges below card matching photo */}
+                <div className="flex flex-col items-center gap-2 my-2">
+                  <div className="bg-black/20 text-slate-900 font-extrabold text-xs px-3.5 py-1 rounded-full">
+                    💰 Earn 10$ TON!
+                  </div>
+
+                  <div className="bg-white/80 backdrop-blur-xs text-slate-800 font-bold text-xs px-3 py-1 rounded-full border border-black/10 flex items-center gap-1.5 shadow-xs">
+                    <span className="text-emerald-600 font-black">●</span>
+                    <span>ads by Monetag</span>
+                  </div>
+
+                  <div className="relative bg-[#1a3821] text-[#86efac] font-black text-xs px-4 py-1.5 rounded-xl shadow-md">
+                    ︾ Click to get the reward!
+                    <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#1a3821] rotate-45" />
+                  </div>
+                </div>
+
+                {/* Big Blue "Continue" Button (Exact matching photo_2026-09-26_17-39-34.jpg) */}
+                <div className="pt-2">
                   <button
-                    id="claim-ad-step-btn"
+                    id="monetag-ad-continue-btn"
                     disabled={!canClaimAd || isAdSubmitting}
                     onClick={handleClaimAdStep}
-                    className={`w-full py-3.5 rounded-2xl font-extrabold text-sm shadow-xl flex items-center justify-center gap-2 transition-all ${
+                    className={`w-full py-4 rounded-2xl font-black text-base shadow-2xl flex items-center justify-center gap-2 transition-all ${
                       canClaimAd
-                        ? 'bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white cursor-pointer active:scale-98 animate-bounce'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                        ? 'bg-[#007aff] hover:bg-[#0069d9] active:scale-98 text-white cursor-pointer shadow-blue-500/50'
+                        : 'bg-[#007aff]/60 text-white/80 cursor-wait'
                     }`}
                   >
-                    <CheckCircle2 className="w-4 h-4" />
                     <span>
                       {isAdSubmitting
                         ? 'ভেরিফাই করা হচ্ছে...'
                         : canClaimAd
-                        ? adsWatched + 1 >= requiredAds
-                          ? '🎉 বিজ্ঞাপন সম্পন্ন করুন ও ইনবক্স আনলক করুন!'
-                          : `বিজ্ঞাপন সম্পন্ন করুন (${adsWatched + 1}/${requiredAds})`
-                        : `অপেক্ষা করুন (${adCountdown}s)`}
+                        ? 'Continue'
+                        : `Continue (${adCountdown}s)`}
                     </span>
                   </button>
                 </div>

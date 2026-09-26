@@ -1899,6 +1899,7 @@ async function startServer() {
         const copyRes = await fetch(`https://api.telegram.org/bot${botToken}/copyMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(3500),
           body: JSON.stringify({
             chat_id: targetChat,
             from_chat_id: fromChat,
@@ -1930,6 +1931,7 @@ async function startServer() {
         const vidRes = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(3500),
           body: JSON.stringify({
             chat_id: targetChat,
             video: video.fullVideoUrl,
@@ -1956,6 +1958,7 @@ async function startServer() {
         const msgRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(3500),
           body: JSON.stringify({
             chat_id: targetChat,
             text: `${caption}\n\n🔗 ফুল ভিডিও লিংক: ${video.fullVideoUrl}`,
