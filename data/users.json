@@ -232,7 +232,8 @@
     "totalCommissionEarnedUsd": 0,
     "claimableCommissionUsd": 0,
     "referralCommissionHistory": [],
-    "createdAt": "2026-09-26T11:15:17.516Z"
+    "createdAt": "2026-09-26T11:15:17.516Z",
+    "balanceBdt": 0
   },
   "test_tester_99": {
     "id": "test_tester_99",
@@ -259,6 +260,7 @@
     "totalCommissionEarnedUsd": 0,
     "claimableCommissionUsd": 0,
     "referralCommissionHistory": [],
-    "createdAt": "2026-09-26T11:15:23.773Z"
+    "createdAt": "2026-09-26T11:15:23.773Z",
+    "balanceBdt": 0
   }
 }
