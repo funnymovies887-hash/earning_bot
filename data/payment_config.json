@@ -1,10 +1,10 @@
 {
-  "bkashNumber": "01789123456",
+  "bkashNumber": "01404662248",
   "bkashType": "Personal",
-  "nagadNumber": "01812345678",
+  "nagadNumber": "01404662248",
   "nagadType": "Personal",
-  "rocketNumber": "019123456789",
-  "binancePayId": "829104712",
+  "rocketNumber": "014046622484",
+  "binancePayId": "775577423",
   "binanceUsdtAddress": "TQn9Y2khEsLJW1ChV5Y... (TRC-20)",
   "instructions": "বিকাশ/নগদ/রকেটে Send Money করুন। পেমেন্ট সম্পন্ন হলে আপনার প্রেরক নম্বর এবং ট্রানজেকশন আইডি (TrxID) নিচে সাবমিট করুন। এডমিন ভেরিফাই করে ৫-১৫ মিনিটের মধ্যে প্যাকেজ এপ্রুভ করে দিবে।"
 }
