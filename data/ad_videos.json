@@ -40,26 +40,5 @@
     "channelId": "@demovideos24",
     "views": 0,
     "unlockedCount": 0
-  },
-  {
-    "id": "lock-vid-2",
-    "title": "Telegram Auto Referral & Channel Growth Masterclass",
-    "description": "টেলিগ্রাম বট ও চ্যানেলে আনলিমিটেড মেম্বার আনার রিয়েল অটোমেশন স্ট্র্যাটেজি ও ট্রাফিক ড্রাইভ সিস্টেম।",
-    "previewDuration": "02:00",
-    "fullDuration": "22:10",
-    "previewVideoUrl": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-    "fullVideoUrl": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-    "thumbnail": "https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=600&auto=format&fit=crop&q=70",
-    "requiredAds": 10,
-    "adTimerSeconds": 30,
-    "adNetworkUrl": "https://adsterra.com",
-    "adNetworkName": "Adsterra Smartlink",
-    "expiryMinutes": 90,
-    "protectContent": true,
-    "deliveryBotHandle": "PremiumVideoDeliveryBot",
-    "demoChannelUrl": "https://t.me/CholoIncomeKori",
-    "channelId": "@CholoIncomeKori",
-    "views": 2613,
-    "unlockedCount": 540
   }
 ]
