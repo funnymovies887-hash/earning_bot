@@ -177,5 +177,32 @@
     "createdAt": "2026-09-26T05:37:42.490Z",
     "lastActiveDate": "2026-09-26",
     "balanceBdt": 0
+  },
+  "6918389524": {
+    "id": "6918389524",
+    "username": "@nabirmia",
+    "displayName": "≛⃝𝐍𝐀𝐁𝐈𝐑𝐌𝐈𝐀 || 𝐂.𝐄.𝐎™ ➤ 𝙾𝙵𝙵𝙸𝙲𝙸𝙰𝙻",
+    "email": "",
+    "avatarUrl": "https://t.me/i/userpic/320/QOEzOnCAcLAZA15cgcAkRXC1foeuTjAXefAMb9Ivoqe2pGXycWlD4oyqrYHvdk5r.svg",
+    "role": "Free Member",
+    "balanceUsd": 0,
+    "pendingReferralBonusUsd": 0,
+    "joinedCount": 0,
+    "activeCount": 0,
+    "inactiveCount": 0,
+    "todayReferrals": 0,
+    "activeReferralsWithActivity": 0,
+    "adsWatchedToday": 0,
+    "dailyAdLimit": 40,
+    "referralCode": "nabirmia",
+    "language": "bn",
+    "currency": "BDT",
+    "claimedDailyTiers": [],
+    "completedTaskIds": [],
+    "referralCommissionRate": 5,
+    "totalCommissionEarnedUsd": 0,
+    "claimableCommissionUsd": 0,
+    "referralCommissionHistory": [],
+    "createdAt": "2026-09-26T06:55:09.643Z"
   }
 }
