@@ -1,0 +1,87 @@
+[
+  {
+    "id": "pkg-1",
+    "title": "Telegram Auto Clicker & Earning Bot Script (Pro v4.2)",
+    "category": "Software",
+    "description": "সম্পূর্ণ রেডি পাইথন/নোড স্ক্রিপ্ট। মাল্টি-অ্যাকাউন্ট সাপোর্ট, অ্যান্টি-ব্যান প্রটেকশন, প্রক্সি রোটেশন সহ অটো টাস্ক কমপ্লিটার। ইন্সটল করে রান করলেই স্বয়ংক্রিয়ভাবে আর্নিং জমা হতে থাকবে।",
+    "features": [
+      "⚡ আনলিমিটেড অ্যাকাউন্ট মাল্টি-থ্রেডিং",
+      "🛡️ রিয়েল প্রক্সি রোটেশন ও অ্যান্টি-ব্যান মেকানিজম",
+      "📥 অটো ব্যালেন্স চেকার ও অটো উইথড্র ফিচার",
+      "👨‍💻 ফুল সোর্স কোড ও লাইফটাইম আপডেট",
+      "💬 ভিআইপি টেলিগ্রাম প্রাইভেট সাপোর্ট গ্রুপ"
+    ],
+    "hashtags": [
+      "#Software",
+      "#TelegramBot",
+      "#PythonScript",
+      "#AutoIncome",
+      "#AntiBan"
+    ],
+    "fileSize": "45 MB (.zip)",
+    "version": "v4.2 Pro",
+    "requirements": "Windows/Linux/Mac অথবা মোবাইল (Termux/Pydroid)",
+    "priceBdt": 450,
+    "priceUsd": 3.75,
+    "thumbnail": "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=500&auto=format&fit=crop&q=60",
+    "downloadUrl": "https://drive.google.com/uc?export=download&id=TELEGRAM_PRO_BOT_SCRIPT_V42",
+    "isActive": true,
+    "salesCount": 142
+  },
+  {
+    "id": "pkg-2",
+    "title": "CPA & Direct Link Traffic Arbitrage Video Course (A to Z)",
+    "category": "Video Course",
+    "description": "১০ ঘণ্টার ফুল মাস্টার কোর্স। পেইড ট্রাফিক ও ফ্রি সোশ্যাল ট্রাফিককে সিপিএ ডিরেক্ট লিংকে পাঠিয়ে হাই আরআইও বের করার সিক্রেট কৌশল। কোনো কোডিং ছাড়াই বিগিনার লেভেল থেকে শুরু করুন।",
+    "features": [
+      "🎥 ১৬টি ফুল এইচডি প্রাইভেট ভিডিও লেকচার",
+      "📊 রিয়েল ক্যাম্পেইন সেটআপ ও অপ্টিমাইজেশন কেস স্টাডি",
+      "💰 কম খরচে হাই কনভার্সন ট্রাফিক কেনার কৌশল",
+      "📄 প্রি-বিল্ড ল্যান্ডিং পেজ টেমপ্লেটস (ফ্রি)",
+      "🔐 প্রাইভেট এক্সেস ও লাইফটাইম ভিডিও ভিউইং"
+    ],
+    "hashtags": [
+      "#VideoCourse",
+      "#CPAArbitrage",
+      "#DirectLink",
+      "#AdsterraSecret",
+      "#Affiliate"
+    ],
+    "fileSize": "3.4 GB (Full HD Videos)",
+    "version": "2026 Master Edition",
+    "requirements": "যেকোনো মোবাইল বা ল্যাপটপ/কম্পিউটার",
+    "priceBdt": 750,
+    "priceUsd": 6.25,
+    "thumbnail": "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=500&auto=format&fit=crop&q=60",
+    "downloadUrl": "https://mega.nz/folder/CPA_ARBITRAGE_MASTERCLASS_2026",
+    "isActive": true,
+    "salesCount": 88
+  },
+  {
+    "id": "pkg-3",
+    "title": "Adsterra 100K Impressions Social Viral Generator Tool",
+    "category": "Tools & Files",
+    "description": "ফেসবুক ও টেলিগ্রামে ভাইরাল ট্রাফিক জেনারেটর মেগা টুলকিট সহ ১০০+ রেডিমেড কনটেন্ট বান্ডেল। সহজে হাজার হাজার রিয়েল ভিজিটর ড্রাইভ করার প্রিমিয়াম রিসোর্স প্যাক।",
+    "features": [
+      "🚀 হাই সিআর কনটেন্ট মেকার সফটওয়্যার",
+      "📦 ১০০+ রেডি প্রুভেন ভাইরাল পোস্ট স্ক্রিপ্ট",
+      "📈 ডিরেক্ট লিংক হাই সিটিআর বাটন জেনারেটর",
+      "📑 স্টেপ বাই স্টেপ সেটআপ ম্যানুয়াল"
+    ],
+    "hashtags": [
+      "#Tools",
+      "#AdsterraTraffic",
+      "#ViralContent",
+      "#AutoPoster"
+    ],
+    "fileSize": "120 MB (.zip)",
+    "version": "v2.8 Toolkit",
+    "requirements": "Mobile & PC Supported",
+    "priceBdt": 350,
+    "priceUsd": 2.9,
+    "thumbnail": "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=500&auto=format&fit=crop&q=60",
+    "downloadUrl": "https://drive.google.com/uc?export=download&id=VIRAL_GENERATOR_TOOLKIT_2026",
+    "isActive": true,
+    "salesCount": 215
+  }
+]
