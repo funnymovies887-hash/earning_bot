@@ -62,6 +62,23 @@ export const AdminStoreOrdersTab: React.FC = () => {
   const [pkgThumbnail, setPkgThumbnail] = useState('https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=500&auto=format&fit=crop&q=60');
   const [pkgDownloadUrl, setPkgDownloadUrl] = useState('https://drive.google.com');
 
+  // Reset New Package Form to clean pristine default state
+  const resetNewPackageForm = () => {
+    setPkgTitle('');
+    setPkgCategory('Software');
+    setPkgDescription('');
+    setPkgFeatures('');
+    setPkgHashtags('#Software, #EarnBot, #DirectLink, #Tools');
+    setPkgFileSize('45 MB (.zip)');
+    setPkgVersion('v4.2 Pro');
+    setPkgRequirements('মোবাইল ও কম্পিউটার সাপোর্টেড');
+    setPkgPriceBdt(450);
+    setPkgPriceUsd(3.75);
+    setPkgThumbnail('https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=500&auto=format&fit=crop&q=60');
+    setPkgDownloadUrl('https://drive.google.com');
+    setIsPkgSaved(false);
+  };
+
   // Reject modal state
   const [rejectingOrderId, setRejectingOrderId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('ভুল ট্রানজেকশন আইডি বা পেমেন্ট পাওয়া যায়নি');
@@ -246,12 +263,9 @@ export const AdminStoreOrdersTab: React.FC = () => {
         fetchAllData();
         performAutoSync(true).catch(() => {});
         setTimeout(() => {
-          setIsPkgSaved(false);
+          resetNewPackageForm();
           setShowAddPackageModal(false);
-          setPkgTitle('');
-          setPkgDescription('');
-          setPkgFeatures('');
-        }, 1800);
+        }, 1500);
       } else {
         setToast({
           type: 'error',
@@ -524,7 +538,10 @@ export const AdminStoreOrdersTab: React.FC = () => {
                   <span>{isSavingCatalog ? 'GitHub-এ সেভ হচ্ছে...' : '💾 ১-ক্লিকে প্যাকেজ আপডেট ও GitHub-এ সেভ'}</span>
                 </button>
                 <button
-                  onClick={() => setShowAddPackageModal(true)}
+                  onClick={() => {
+                    resetNewPackageForm();
+                    setShowAddPackageModal(true);
+                  }}
                   className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950 rounded-xl text-xs font-black transition-all shadow-lg flex items-center gap-2 cursor-pointer active:scale-95"
                 >
                   <Plus className="w-4 h-4" />
@@ -1052,7 +1069,10 @@ export const AdminStoreOrdersTab: React.FC = () => {
                 নতুন ডিজিটাল প্যাকেজ যোগ করুন
               </h3>
               <button
-                onClick={() => setShowAddPackageModal(false)}
+                onClick={() => {
+                  resetNewPackageForm();
+                  setShowAddPackageModal(false);
+                }}
                 className="w-7 h-7 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer"
               >
                 ✕
@@ -1218,7 +1238,10 @@ export const AdminStoreOrdersTab: React.FC = () => {
               <div className="flex items-center gap-2 pt-3 border-t border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setShowAddPackageModal(false)}
+                  onClick={() => {
+                    resetNewPackageForm();
+                    setShowAddPackageModal(false);
+                  }}
                   className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl cursor-pointer"
                 >
                   বাতিল

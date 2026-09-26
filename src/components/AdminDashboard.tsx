@@ -140,6 +140,17 @@ export const AdminDashboard: React.FC = () => {
   const [newVideoDuration, setNewVideoDuration] = useState('05:00');
   const [newVideoThumb, setNewVideoThumb] = useState('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60');
 
+  // Reset Add Video Task modal form to clean default state
+  const resetNewVideoTaskForm = () => {
+    setNewVideoTitle('');
+    setNewVideoCategory('online-income');
+    setNewVideoSubCategory('Telegram');
+    setNewVideoReward('0.20');
+    setNewVideoDuration('05:00');
+    setNewVideoThumb('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60');
+    setIsVideoSaved(false);
+  };
+
   // Broadcast state
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [broadcastSuccess, setBroadcastSuccess] = useState('');
@@ -346,14 +357,34 @@ export const AdminDashboard: React.FC = () => {
   const handleManualAutoSync = async () => {
     setIsAutoSyncing(true);
     try {
+      // 1. Snapshot and server auto-sync
       const res = await performAutoSync(true);
-      if (res.success) {
+
+      // 2. Direct GitHub Auto-Commit push
+      let ghResult: any = null;
+      try {
+        const ghRes = await fetch('/api/admin/github-sync/push', { method: 'POST' });
+        ghResult = await ghRes.json();
+      } catch (ghErr: any) {
+        console.warn('GitHub push error during auto-sync:', ghErr);
+      }
+
+      if (ghResult && ghResult.success) {
         setToast({
           type: 'success',
-          title: 'অটো-সিঙ্ক ও আপডেট সম্পন্ন!',
-          message: 'প্যাকেজ, ব্যবহারকারী ও সেটিংস শতভাগ সুরক্ষিত ও সিঙ্ক হয়েছে।',
+          title: 'সার্ভার ও GitHub অটো-কমিট সম্পন্ন! 🚀',
+          message: `এডমিন প্যানেলের সমস্ত আপডেট সফলভাবে সেভ হয়েছে এবং GitHub-এ সরাসরি অটো-কমিট সম্পন্ন হয়েছে! (${ghResult.successCount}টি ফাইল)`,
         });
-        fetchData();
+        setAutoSyncBanner(`🎉 ১-ক্লিকে সমস্ত ডাটা সার্ভার ও GitHub-এ সফলভাবে সেভ ও অটো-কমিট হয়েছে! (${ghResult.successCount}টি ফাইল)`);
+      } else if (res.success) {
+        setToast({
+          type: 'success',
+          title: 'সার্ভারে সফলভাবে সেভ ও ব্যাকআপ হয়েছে! ✅',
+          message: ghResult?.error
+            ? `সার্ভারে সংরক্ষিত। (গিটহাব সিঙ্ক: ${ghResult.error})`
+            : 'প্যাকেজ, ব্যবহারকারী ও সেটিংস শতভাগ সুরক্ষিত ও সিঙ্ক হয়েছে।',
+        });
+        setAutoSyncBanner(ghResult?.error ? `সার্ভারে সেভ হয়েছে। (${ghResult.error})` : res.message);
       } else {
         setToast({
           type: 'error',
@@ -361,6 +392,7 @@ export const AdminDashboard: React.FC = () => {
           message: res.message,
         });
       }
+      fetchData();
     } catch (e: any) {
       setToast({
         type: 'error',
@@ -550,9 +582,8 @@ export const AdminDashboard: React.FC = () => {
         });
         fetchData();
         setTimeout(() => {
-          setIsVideoSaved(false);
+          resetNewVideoTaskForm();
           setShowAddVideo(false);
-          setNewVideoTitle('');
         }, 1500);
       } else {
         setToast({
@@ -1335,7 +1366,10 @@ export const AdminDashboard: React.FC = () => {
                 <p className="text-xs text-slate-400 mt-0.5">Manage the tasks users complete for ad rewards</p>
               </div>
               <button
-                onClick={() => setShowAddVideo(true)}
+                onClick={() => {
+                  resetNewVideoTaskForm();
+                  setShowAddVideo(true);
+                }}
                 className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs transition-all shadow-md shadow-amber-500/20"
               >
                 <Plus className="w-4 h-4" />
@@ -1988,7 +2022,10 @@ export const AdminDashboard: React.FC = () => {
                 <div className="flex gap-2 pt-3">
                   <button
                     type="button"
-                    onClick={() => setShowAddVideo(false)}
+                    onClick={() => {
+                      resetNewVideoTaskForm();
+                      setShowAddVideo(false);
+                    }}
                     className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2.5 rounded-xl text-xs transition-colors cursor-pointer"
                   >
                     Cancel

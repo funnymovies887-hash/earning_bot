@@ -126,6 +126,23 @@ export const AdminIncomeMethodsManager: React.FC<AdminIncomeMethodsManagerProps>
     setTimeout(() => setStatusMessage(null), 3500);
   };
 
+  // Reset New Task Form to clean default empty state
+  const resetNewTaskForm = () => {
+    setNewTitle('');
+    setNewCategory('visit');
+    setNewSubCategory('Adsterra Direct Link');
+    setNewDestinationUrl('');
+    setNewRewardBdt(0.15);
+    setNewRewardUsd(+(0.15 / 120).toFixed(6));
+    setNewTimerSeconds(15);
+    setNewMediaType('image');
+    setNewMediaUrl('');
+    setNewInstructions('');
+    setNewIsHot(false);
+    setNewIsActive(true);
+    setIsTaskSaved(false);
+  };
+
   // Create Task
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,7 +185,6 @@ export const AdminIncomeMethodsManager: React.FC<AdminIncomeMethodsManagerProps>
       });
 
       if (res.ok) {
-        const data = await res.json();
         setIsTaskSaved(true);
         setToast({
           type: 'success',
@@ -177,13 +193,9 @@ export const AdminIncomeMethodsManager: React.FC<AdminIncomeMethodsManagerProps>
         });
         await fetchTasks();
         setTimeout(() => {
-          setIsTaskSaved(false);
-          setNewTitle('');
-          setNewDestinationUrl('');
-          setNewMediaUrl('');
-          setNewInstructions('');
+          resetNewTaskForm();
           setActiveSubTab('tasks');
-        }, 1800);
+        }, 1500);
       } else {
         const err = await res.json();
         setToast({
@@ -411,7 +423,10 @@ export const AdminIncomeMethodsManager: React.FC<AdminIncomeMethodsManagerProps>
             </button>
             <button
               type="button"
-              onClick={() => setActiveSubTab('add')}
+              onClick={() => {
+                resetNewTaskForm();
+                setActiveSubTab('add');
+              }}
               className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-lg active:scale-98 transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4" />
@@ -483,7 +498,10 @@ export const AdminIncomeMethodsManager: React.FC<AdminIncomeMethodsManagerProps>
 
         <button
           type="button"
-          onClick={() => setActiveSubTab('add')}
+          onClick={() => {
+            resetNewTaskForm();
+            setActiveSubTab('add');
+          }}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
             activeSubTab === 'add'
               ? 'bg-amber-500 text-slate-950 font-black shadow-md'
@@ -611,7 +629,10 @@ export const AdminIncomeMethodsManager: React.FC<AdminIncomeMethodsManagerProps>
               </p>
               <button
                 type="button"
-                onClick={() => setActiveSubTab('add')}
+                onClick={() => {
+                  resetNewTaskForm();
+                  setActiveSubTab('add');
+                }}
                 className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold cursor-pointer"
               >
                 + নতুন টাস্ক যোগ করুন
@@ -1087,7 +1108,10 @@ export const AdminIncomeMethodsManager: React.FC<AdminIncomeMethodsManagerProps>
           <div className="pt-4 border-t border-slate-800 flex items-center justify-end gap-3">
             <button
               type="button"
-              onClick={() => setActiveSubTab('tasks')}
+              onClick={() => {
+                resetNewTaskForm();
+                setActiveSubTab('tasks');
+              }}
               className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 cursor-pointer"
             >
               বাতিল

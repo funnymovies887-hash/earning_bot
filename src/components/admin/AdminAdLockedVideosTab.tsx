@@ -49,6 +49,27 @@ export const AdminAdLockedVideosTab: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPostingChannel, setIsPostingChannel] = useState<string | null>(null);
 
+  // Reset New Video Form to clean pristine default state
+  const resetNewVideoForm = () => {
+    setTitle('');
+    setDescription('');
+    setPreviewDuration('02:00');
+    setFullDuration('18:40');
+    setPreviewVideoUrl('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4');
+    setFullVideoUrl('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
+    setThumbnail('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=70');
+    setRequiredAds(15);
+    setAdTimerSeconds(15);
+    setAdNetworkUrl('https://monetag.com');
+    setAdNetworkName('Monetag Direct Link');
+    setExpiryMinutes(90);
+    setDeliveryBotHandle('PremiumVideoDeliveryBot');
+    setDemoChannelUrl('');
+    setChannelId('');
+    setStatusMsg(null);
+    setIsVideoSaved(false);
+  };
+
   // Fetch videos
   const fetchVideos = async () => {
     setLoading(true);
@@ -149,11 +170,9 @@ export const AdminAdLockedVideosTab: React.FC = () => {
         });
         fetchVideos();
         setTimeout(() => {
-          setIsVideoSaved(false);
+          resetNewVideoForm();
           setShowAddModal(false);
-          setTitle('');
-          setDescription('');
-        }, 1800);
+        }, 1500);
       } else {
         setToast({
           type: 'error',
@@ -313,7 +332,10 @@ export const AdminAdLockedVideosTab: React.FC = () => {
             </button>
 
             <button
-              onClick={() => setShowAddModal(true)}
+              onClick={() => {
+                resetNewVideoForm();
+                setShowAddModal(true);
+              }}
               className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-black transition-all shadow-lg flex items-center gap-2 cursor-pointer active:scale-95"
             >
               <Plus className="w-4 h-4" />
@@ -522,7 +544,10 @@ export const AdminAdLockedVideosTab: React.FC = () => {
                 নতুন অ্যাড-লকড ভিডিও যোগ করুন
               </h3>
               <button
-                onClick={() => setShowAddModal(false)}
+                onClick={() => {
+                  resetNewVideoForm();
+                  setShowAddModal(false);
+                }}
                 className="w-7 h-7 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer"
               >
                 ✕
@@ -710,7 +735,10 @@ export const AdminAdLockedVideosTab: React.FC = () => {
               <div className="flex items-center gap-2 pt-3 border-t border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => {
+                    resetNewVideoForm();
+                    setShowAddModal(false);
+                  }}
                   className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl cursor-pointer"
                 >
                   বাতিল

@@ -2559,7 +2559,7 @@ async function startServer() {
 
   // Auto-sync & Intelligent Merge endpoint:
   // Merges client-side vault data into live server without deleting existing packages or users.
-  app.post("/api/admin/backup/auto-sync", (req, res) => {
+  app.post("/api/admin/backup/auto-sync", async (req, res) => {
     try {
       const payload = req.body;
       if (!payload || typeof payload !== "object") {
@@ -2651,9 +2651,39 @@ async function startServer() {
 
       console.log(`[Auto-Sync] Merged successfully: +${addedPackages} packages, +${updatedUsers} users`);
 
+      // If GitHub is configured, also push to GitHub
+      let githubAutoPushed = false;
+      if (githubSyncConfig.token && githubSyncConfig.repo && (githubSyncConfig.autoSyncOnChange !== false)) {
+        try {
+          const filesToPush = [
+            { path: "data/packages.json", content: JSON.stringify(serverPackages, null, 2) },
+            { path: "data/deleted_package_ids.json", content: JSON.stringify(deletedPackageIds, null, 2) },
+            { path: "data/ad_videos.json", content: JSON.stringify(serverAdLockedVideos, null, 2) },
+            { path: "data/tasks.json", content: JSON.stringify(serverTasks, null, 2) },
+            { path: "data/payment_config.json", content: JSON.stringify(serverPaymentConfig, null, 2) },
+            { path: "data/income_methods_config.json", content: JSON.stringify(incomeMethodsConfig, null, 2) },
+            { path: "data/telegram_config.json", content: JSON.stringify(telegramConfig, null, 2) },
+            { path: "data/notices.json", content: JSON.stringify(noticesConfig, null, 2) },
+            { path: "data/users.json", content: JSON.stringify(usersMap, null, 2) },
+          ];
+          for (const f of filesToPush) {
+            await pushFileToGitHubDirect(f.path, f.content, `Auto-Sync: Update ${f.path}`);
+          }
+          githubAutoPushed = true;
+          githubSyncConfig.lastSyncedAt = new Date().toISOString();
+          githubSyncConfig.lastStatus = `✅ অটো-সিঙ্কে সমস্ত ফাইল গিটহাবে পুশ সম্পন্ন`;
+          saveJsonFile("github_sync_config.json", githubSyncConfig);
+        } catch (ghPushErr) {
+          console.warn("[Auto-Sync GitHub push warning]:", ghPushErr);
+        }
+      }
+
       res.json({
         success: true,
-        message: "✅ অটো-সিঙ্ক সম্পন্ন! প্যাকেজ ও ইউজার ডাটা অক্ষত রাখা হয়েছে।",
+        message: githubAutoPushed
+          ? "✅ অটো-সিঙ্ক ও GitHub অটো-কমিট সম্পন্ন! প্যাকেজ ও ইউজার ডাটা অক্ষত ও সংরক্ষিত হয়েছে।"
+          : "✅ অটো-সিঙ্ক সম্পন্ন! প্যাকেজ ও ইউজার ডাটা অক্ষত রাখা হয়েছে।",
+        githubAutoPushed,
         addedPackages,
         updatedUsers,
         counts: {
