@@ -52,12 +52,15 @@ export function getVaultSnapshot(): { timestamp: string; displayTime: string; da
  */
 export function updateVaultPackages(packages: any[]): void {
   try {
+    const clean = (packages || []).filter(
+      (p: any) => p && p.id && !['pkg-1', 'pkg-2', 'pkg-3'].includes(p.id)
+    );
     const vault = getVaultSnapshot();
     if (vault && vault.data) {
-      vault.data.packages = packages;
+      vault.data.packages = clean;
       localStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(vault));
     }
-    localStorage.setItem('earn_digital_packages', JSON.stringify(packages));
+    localStorage.setItem('earn_digital_packages', JSON.stringify(clean));
   } catch (e) {
     console.warn('[AdminVault] updateVaultPackages warning:', e);
   }
@@ -66,10 +69,9 @@ export function updateVaultPackages(packages: any[]): void {
 /**
  * Intelligent Auto-Sync:
  * 1. Checks current server state via /api/admin/backup/export
- * 2. Compares with local browser vault
- * 3. If server is missing packages or users (e.g. after container restart / fresh GitHub deploy),
- *    it sends an auto-sync merge request to restore them immediately!
- * 4. If server has latest data, updates the browser vault to keep it safe.
+ * 2. Prunes any legacy demo packages (pkg-1, pkg-2, pkg-3)
+ * 3. Updates browser localStorage and vault with pristine server data
+ * 4. Ensures deleted packages never return
  */
 export async function performAutoSync(forceSync = false): Promise<{
   success: boolean;
@@ -88,53 +90,27 @@ export async function performAutoSync(forceSync = false): Promise<{
     const serverData = serverPayload.data || {};
     const serverCounts = serverPayload.counts || {};
 
-    const serverPkgCount = serverData.packages?.length || 0;
+    const rawPackages = Array.isArray(serverData.packages) ? serverData.packages : [];
+    // Strict filter: remove any legacy demo package IDs
+    const cleanPackages = rawPackages.filter(
+      (p: any) => p && p.id && !['pkg-1', 'pkg-2', 'pkg-3'].includes(p.id)
+    );
+
+    // Save clean packages to user digital store cache
+    localStorage.setItem('earn_digital_packages', JSON.stringify(cleanPackages));
+
+    // Save pristine snapshot to master vault
+    serverData.packages = cleanPackages;
+    saveVaultSnapshot({ ...serverPayload, data: serverData });
+
+    const serverPkgCount = cleanPackages.length;
     const serverUserCount = Object.keys(serverData.users || {}).length;
-
-    const vault = getVaultSnapshot();
-
-    // Only if forceSync is explicitly true (manual user action from backup screen),
-    // we trigger auto-merge back to server.
-    // NEVER automatically restore on normal page loads, because that resurrects items deleted by admin!
-    if (forceSync && vault && vault.data) {
-      const vaultPkgCount = vault.data.packages?.length || 0;
-      const vaultUserCount = Object.keys(vault.data.users || {}).length;
-
-      // Trigger auto-merge back to server!
-      const mergeRes = await fetch('/api/admin/backup/auto-sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: vault.data }),
-      });
-
-      if (mergeRes.ok) {
-        const mergeResult = await mergeRes.json();
-        // Also fetch fresh server state to refresh vault
-        const refreshRes = await fetch('/api/admin/backup/export');
-        if (refreshRes.ok) {
-          const freshData = await refreshRes.json();
-          saveVaultSnapshot(freshData);
-        }
-
-        return {
-          success: true,
-          action: 'restored',
-          addedPackages: mergeResult.addedPackages || (vaultPkgCount - serverPkgCount),
-          updatedUsers: mergeResult.updatedUsers || (vaultUserCount - serverUserCount),
-          serverCounts: mergeResult.counts,
-          message: `✅ ব্যাকআপ রিস্টোর সফল! ${vaultPkgCount}টি প্যাকেজ ও ইউজার ডাটা সার্ভারে রিস্টোর করা হয়েছে।`,
-        };
-      }
-    }
-
-    // Otherwise, server is healthy/newer: update local vault
-    saveVaultSnapshot(serverPayload);
 
     return {
       success: true,
       action: 'backed_up',
-      serverCounts,
-      message: `✅ সকল ডাটা ব্রাউজার ভল্টে অটো-সেভ ও সিঙ্ক রয়েছে (${serverPkgCount}টি প্যাকেজ, ${serverUserCount} জন ইউজার)।`,
+      serverCounts: { ...serverCounts, packages: serverPkgCount },
+      message: `✅ সমস্ত ডাটা সার্ভার ও ব্রাউজারে সফলভাবে সংরক্ষিত রয়েছে (${serverPkgCount}টি প্যাকেজ, ${serverUserCount} জন ইউজার)।`,
     };
   } catch (err: any) {
     console.error('[AdminVault AutoSync Error]:', err);

@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { UserProfile, VideoItem, WithdrawalRequest } from '../types';
 import { AdminAdLockedVideosTab } from './admin/AdminAdLockedVideosTab';
+import { AdminChannelPublisherTab } from './admin/AdminChannelPublisherTab';
 import { AdminStoreOrdersTab } from './admin/AdminStoreOrdersTab';
 import { AdminNoticeBroadcastManager } from './AdminNoticeBroadcastManager';
 import { AdminUptimeRobotTab } from './admin/AdminUptimeRobotTab';
@@ -42,6 +43,7 @@ import { AdminFloatingToast, AdminToastData } from './admin/AdminFloatingToast';
 import { AdminSaveButton } from './admin/AdminSaveButton';
 import { Activity } from 'lucide-react';
 import { performAutoSync } from '../utils/adminAutoSync';
+import { setAdminActiveState } from '../utils/monetag';
 
 export const AdminDashboard: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -52,7 +54,7 @@ export const AdminDashboard: React.FC = () => {
   const [loginError, setLoginError] = useState('');
 
   // Dashboard state
-  const [activeMenu, setActiveMenu] = useState<'overview' | 'withdrawals' | 'users' | 'videos' | 'broadcast' | 'telegram' | 'methods' | 'ad-locked-videos' | 'store-orders' | 'uptimerobot' | 'backup'>('overview');
+  const [activeMenu, setActiveMenu] = useState<'overview' | 'withdrawals' | 'users' | 'videos' | 'broadcast' | 'telegram' | 'methods' | 'ad-locked-videos' | 'channel-publisher' | 'store-orders' | 'uptimerobot' | 'backup'>('overview');
   const [stats, setStats] = useState<any>(null);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
@@ -357,7 +359,7 @@ export const AdminDashboard: React.FC = () => {
   const handleManualAutoSync = async () => {
     setIsAutoSyncing(true);
     try {
-      // 1. Snapshot and server auto-sync
+      // 1. Refresh browser vault and user caches from authoritative server state
       const res = await performAutoSync(true);
 
       // 2. Direct GitHub Auto-Commit push
@@ -379,9 +381,9 @@ export const AdminDashboard: React.FC = () => {
       } else if (res.success) {
         setToast({
           type: 'success',
-          title: 'সার্ভারে সফলভাবে সেভ ও ব্যাকআপ হয়েছে! ✅',
+          title: 'সার্ভারে সফলভাবে সেভ ও সুরক্ষিত হয়েছে! ✅',
           message: ghResult?.error
-            ? `সার্ভারে সংরক্ষিত। (গিটহাব সিঙ্ক: ${ghResult.error})`
+            ? `সার্ভারে প্যাকেজ ও ডাটা সুরক্ষিত। (${ghResult.error})`
             : 'প্যাকেজ, ব্যবহারকারী ও সেটিংস শতভাগ সুরক্ষিত ও সিঙ্ক হয়েছে।',
         });
         setAutoSyncBanner(ghResult?.error ? `সার্ভারে সেভ হয়েছে। (${ghResult.error})` : res.message);
@@ -405,18 +407,20 @@ export const AdminDashboard: React.FC = () => {
   };
 
   useEffect(() => {
+    setAdminActiveState(true);
+    document.body.classList.add('admin-active');
+    return () => {
+      setAdminActiveState(false);
+      document.body.classList.remove('admin-active');
+    };
+  }, []);
+
+  useEffect(() => {
     if (isAuthenticated) {
       fetchData();
-      // Auto-Sync Safety Net: Check if server is missing any packages/users from vault
       performAutoSync().then((result) => {
-        if (result && result.action === 'restored') {
-          setAutoSyncBanner(result.message);
-          setToast({
-            type: 'success',
-            title: 'অটো-সিঙ্ক সফল!',
-            message: result.message,
-          });
-          fetchData();
+        if (result && result.message) {
+          console.log('[AdminDashboard] AutoSync on load:', result.message);
         }
       });
     }
@@ -923,6 +927,18 @@ export const AdminDashboard: React.FC = () => {
           </button>
 
           <button
+            onClick={() => setActiveMenu('channel-publisher')}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+              activeMenu === 'channel-publisher'
+                ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/20'
+                : 'text-slate-400 hover:bg-slate-800/60 hover:text-white'
+            }`}
+          >
+            <Send className="w-4 h-4 text-blue-400" />
+            <span>চ্যানেল পোস্ট পাবলিশার</span>
+          </button>
+
+          <button
             onClick={() => setActiveMenu('store-orders')}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
               activeMenu === 'store-orders'
@@ -994,6 +1010,7 @@ export const AdminDashboard: React.FC = () => {
               {activeMenu === 'telegram' && 'Telegram Bot & Channel Verification'}
               {activeMenu === 'methods' && '৫টি ইনকাম মেথড ও উত্তোলন নিয়মাবলি কন্ট্রোল'}
               {activeMenu === 'ad-locked-videos' && 'লকড ভিডিও ও ৯০ মিনিট অটো-এক্সপায়ারি'}
+              {activeMenu === 'channel-publisher' && '📢 টেলিগ্রাম চ্যানেল পোস্ট পাবলিশার (৩টি বাটনসহ)'}
               {activeMenu === 'store-orders' && 'ডিজিটাল স্টোর ও ম্যানুয়াল পেমেন্ট অর্ডার'}
               {activeMenu === 'uptimerobot' && 'সার্ভার ও UptimeRobot (24/7 Keep-Alive)'}
               {activeMenu === 'backup' && 'ডাটাবেজ ব্যাকআপ, রিস্টোর ও গিটহাব সিঙ্ক'}
@@ -1823,6 +1840,11 @@ export const AdminDashboard: React.FC = () => {
         {/* VIEW: Ad-Locked Videos & 90-min Auto-Expiry */}
         {activeMenu === 'ad-locked-videos' && (
           <AdminAdLockedVideosTab />
+        )}
+
+        {/* VIEW: Telegram Channel Post Publisher with 3 Inline Buttons */}
+        {activeMenu === 'channel-publisher' && (
+          <AdminChannelPublisherTab />
         )}
 
         {/* VIEW: Digital Store & Manual Payment Orders */}

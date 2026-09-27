@@ -831,8 +831,11 @@ export const AdminStoreOrdersTab: React.FC = () => {
               >
                 <div className="flex items-start gap-3">
                   <img
-                    src={pkg.thumbnail}
+                    src={pkg.thumbnail || 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=500&auto=format&fit=crop&q=60'}
                     alt={pkg.title}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=500&auto=format&fit=crop&q=60';
+                    }}
                     className="w-20 h-20 rounded-xl object-cover border border-slate-700 shrink-0"
                   />
                   <div className="flex-1 min-w-0">

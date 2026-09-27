@@ -13,9 +13,11 @@ import {
   Film,
   Zap,
   Eye,
+  Loader2,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { AdLockedVideo, UserProfile } from '../types';
+import { showMonetagRewardedAd } from '../utils/monetag';
 
 interface AdLockedVideoPlayerModalProps {
   video: AdLockedVideo | null;
@@ -40,10 +42,8 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
   const [remainingExpireSeconds, setRemainingExpireSeconds] = useState<number>(0);
   const [isExpired, setIsExpired] = useState(false);
 
-  // Active watching ad modal/timer matching Monetag In-App style
-  const [isWatchingAd, setIsWatchingAd] = useState(false);
-  const [adCountdown, setAdCountdown] = useState(6);
-  const [canClaimAd, setCanClaimAd] = useState(false);
+  // Active watching Monetag ad state
+  const [isAdPlaying, setIsAdPlaying] = useState(false);
   const [isAdSubmitting, setIsAdSubmitting] = useState(false);
 
   // Sending to channel status
@@ -55,7 +55,8 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
     if (!isOpen || !video) return;
 
     setIsExpired(false);
-    setIsWatchingAd(false);
+    setIsAdPlaying(false);
+    setIsAdSubmitting(false);
     setStatusNotification(null);
     setAdsWatched(video.adsWatched || 0);
     setIsUnlocked(Boolean(video.unlocked || video.isUnlocked));
@@ -102,28 +103,6 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
     return () => clearInterval(timer);
   }, [isDelivered, remainingExpireSeconds]);
 
-  // Active Ad Countdown Timer (Fast 6s or custom seconds)
-  useEffect(() => {
-    if (!isWatchingAd) return;
-
-    setCanClaimAd(false);
-    const targetSeconds = Math.min(video?.adTimerSeconds || 6, 15);
-    setAdCountdown(targetSeconds);
-
-    const timer = setInterval(() => {
-      setAdCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setCanClaimAd(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [isWatchingAd, video]);
-
   if (!isOpen || !video) return null;
 
   const requiredAds = video.requiredAds || 1;
@@ -158,51 +137,49 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
     openTelegramLinkSafe(targetUrl);
   };
 
-  // Start watching an ad (opens Monetag screen)
-  const handleStartWatchAd = () => {
-    setIsWatchingAd(true);
-    try {
-      const adUrl = video.adNetworkUrl || 'https://omg10.com/4/11882677';
-      window.open(adUrl, '_blank', 'noopener,noreferrer');
-    } catch {}
-  };
-
-  // Claim Ad Step when countdown is 0
-  const handleClaimAdStep = async () => {
-    if (!canClaimAd || isAdSubmitting) return;
-    setIsAdSubmitting(true);
+  // Trigger real Monetag rewarded ad (show_11898539 / show_11898539('pop'))
+  const handleWatchMonetagAd = async () => {
+    if (isAdPlaying || isAdSubmitting) return;
+    setIsAdPlaying(true);
+    setStatusNotification(null);
 
     try {
-      const res = await fetch('/api/ad-videos/progress', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ videoId: video.id, userId: user.id }),
-      });
-      const data = await res.json();
+      // 1. Invoke official Monetag Rewarded format
+      const completed = await showMonetagRewardedAd();
 
-      if (data.success) {
-        setAdsWatched(data.adsWatched);
+      if (completed) {
+        setIsAdSubmitting(true);
+        const res = await fetch('/api/ad-videos/progress', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ videoId: video.id, userId: user.id }),
+        });
+        const data = await res.json();
 
-        if (data.canSendInbox || data.adsWatched >= requiredAds) {
-          setIsWatchingAd(false);
-          confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
-          setStatusNotification({
-            type: 'success',
-            text: '🎉 বিজ্ঞাপন দেখা সম্পন্ন হয়েছে! এবার নিচের নীল বাটনে ক্লিক করে ইনবক্সে ফুল ভিডিও নিন।',
-          });
-        } else {
-          setIsWatchingAd(false);
-          setStatusNotification({
-            type: 'success',
-            text: `একটি বিজ্ঞাপন সম্পন্ন হয়েছে! বাকি আছে ${Math.max(0, requiredAds - data.adsWatched)}টি।`,
-          });
+        if (data.success) {
+          setAdsWatched(data.adsWatched);
+
+          if (data.canSendInbox || data.adsWatched >= requiredAds) {
+            confetti({ particleCount: 90, spread: 80, origin: { y: 0.6 } });
+            setStatusNotification({
+              type: 'success',
+              text: '🎉 বিজ্ঞাপন দেখা সম্পন্ন হয়েছে! এবার নিচের নীল বাটনে ক্লিক করে ইনবক্সে ফুল ভিডিও নিন।',
+            });
+            onUnlockSuccess?.(video.id);
+          } else {
+            setStatusNotification({
+              type: 'success',
+              text: `একটি বিজ্ঞাপন সম্পন্ন হয়েছে! বাকি আছে ${Math.max(0, requiredAds - data.adsWatched)}টি।`,
+            });
+          }
         }
       }
-    } catch {
-      const next = adsWatched + 1;
-      setAdsWatched(next);
-      setIsWatchingAd(false);
+    } catch (err: any) {
+      console.warn('[Monetag] Ad watch error:', err);
+      // Fallback increment so users are never permanently blocked
+      setAdsWatched((prev) => prev + 1);
     } finally {
+      setIsAdPlaying(false);
       setIsAdSubmitting(false);
     }
   };
@@ -492,133 +469,26 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
               <button
                 id="watch-ad-bottom-btn"
                 type="button"
-                onClick={handleStartWatchAd}
+                disabled={isAdPlaying || isAdSubmitting}
+                onClick={handleWatchMonetagAd}
                 className="w-full py-3.5 px-4 bg-[#007aff] hover:bg-[#0069d9] active:scale-98 text-white font-black text-sm rounded-2xl shadow-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
               >
-                <Play className="w-4 h-4 fill-white" />
-                <span>
-                  বিজ্ঞাপন দেখুন ({adsWatched + 1}/{requiredAds}) - Watch Ad
-                </span>
+                {isAdPlaying || isAdSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                    <span>বিজ্ঞাপন চলছে... (Watching Monetag Ad)</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 fill-white" />
+                    <span>
+                      বিজ্ঞাপন দেখুন ({adsWatched + 1}/{requiredAds}) - Watch Ad
+                    </span>
+                  </>
+                )}
               </button>
             )}
           </div>
-
-          {/* Interactive In-App Ad Watcher Screen - EXACTLY Matching photo_2026-09-26_17-39-34.jpg! */}
-          <AnimatePresence>
-            {isWatchingAd && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 z-50 bg-[#9fd94f] p-4 flex flex-col justify-between overflow-y-auto select-none"
-                style={{
-                  backgroundImage: `radial-gradient(#8ec93f 15%, transparent 16%)`,
-                  backgroundSize: '16px 16px',
-                }}
-              >
-                {/* Purple Top Navbar as in Screenshot */}
-                <div className="-m-4 mb-2 p-3 bg-[#7c3aed] text-white flex items-center justify-between shadow-md">
-                  <button
-                    onClick={() => setIsWatchingAd(false)}
-                    className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/20 cursor-pointer"
-                  >
-                    <X className="w-5 h-5 text-white" />
-                  </button>
-                  <div className="flex items-center gap-1.5 font-black text-sm">
-                    <span>🎁 Smart Earning 💸</span>
-                  </div>
-                  <div className="w-7 h-7" />
-                </div>
-
-                {/* Top Center Timer Badge (00:06 format as in photo) */}
-                <div className="flex justify-center my-1">
-                  <div className="bg-black/30 backdrop-blur-xs text-white font-mono font-bold text-xs px-3.5 py-1 rounded-full shadow-sm">
-                    00:0{adCountdown}
-                  </div>
-                </div>
-
-                {/* Center Creative Ad Card matching photo */}
-                <div className="bg-white rounded-3xl overflow-hidden shadow-2xl border border-white/40 my-2">
-                  <div className="relative aspect-[4/3] bg-gradient-to-br from-indigo-900 via-purple-900 to-blue-900 flex items-center justify-center overflow-hidden p-4">
-                    {/* Game / Ton Visual Illustration */}
-                    <div className="relative w-full h-full flex flex-col items-center justify-center text-center">
-                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-200 border-2 border-white flex items-center justify-center shadow-xl mb-2">
-                        <span className="text-2xl font-black text-blue-950">💎</span>
-                      </div>
-                      <span className="bg-amber-400 text-slate-950 px-3 py-1 rounded-full font-black text-xs uppercase tracking-wider shadow-md">
-                        PLAY GAMES EARN TON
-                      </span>
-                    </div>
-
-                    <div className="absolute top-3 left-3 bg-blue-600/90 text-white text-[10px] font-black px-2 py-0.5 rounded-lg border border-white/30">
-                      Hun Fun Box
-                    </div>
-                    <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-blue-500/90 text-white flex items-center justify-center font-bold text-xs">
-                      TON
-                    </div>
-                  </div>
-
-                  {/* Headline & Body */}
-                  <div className="p-4 space-y-1">
-                    <h4 className="text-base font-black text-slate-900">
-                      Your Wallet. Your TON.
-                    </h4>
-                    <p className="text-xs text-slate-600 font-medium">
-                      Straight to your wallet. No deposit, no KYC.
-                    </p>
-                    <div className="flex items-center justify-between pt-2">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-6 h-6 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">
-                          🎮
-                        </div>
-                        <span className="text-[11px] font-bold text-slate-800">Hun Fun Box</span>
-                      </div>
-                      <span className="text-[10px] text-slate-400 font-medium">Ad</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Badges below card matching photo */}
-                <div className="flex flex-col items-center gap-2 my-2">
-                  <div className="bg-black/20 text-slate-900 font-extrabold text-xs px-3.5 py-1 rounded-full">
-                    💰 Earn 10$ TON!
-                  </div>
-
-                  <div className="bg-white/80 backdrop-blur-xs text-slate-800 font-bold text-xs px-3 py-1 rounded-full border border-black/10 flex items-center gap-1.5 shadow-xs">
-                    <span className="text-emerald-600 font-black">●</span>
-                    <span>ads by Monetag</span>
-                  </div>
-
-                  <div className="relative bg-[#1a3821] text-[#86efac] font-black text-xs px-4 py-1.5 rounded-xl shadow-md">
-                    ︾ Click to get the reward!
-                    <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#1a3821] rotate-45" />
-                  </div>
-                </div>
-
-                {/* Big Blue "Continue" Button (Exact matching photo_2026-09-26_17-39-34.jpg) */}
-                <div className="pt-2">
-                  <button
-                    id="monetag-ad-continue-btn"
-                    disabled={!canClaimAd || isAdSubmitting}
-                    onClick={handleClaimAdStep}
-                    className={`w-full py-4 rounded-2xl font-black text-base shadow-2xl flex items-center justify-center gap-2 transition-all ${
-                      canClaimAd
-                        ? 'bg-[#007aff] hover:bg-[#0069d9] active:scale-98 text-white cursor-pointer shadow-blue-500/50'
-                        : 'bg-[#007aff]/60 text-white/80 cursor-wait'
-                    }`}
-                  >
-                    <span>
-                      {isAdSubmitting
-                        ? 'ভেরিফাই করা হচ্ছে...'
-                        : canClaimAd
-                        ? 'Continue'
-                        : `Continue (${adCountdown}s)`}
-                    </span>
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </motion.div>
       </div>
     </AnimatePresence>

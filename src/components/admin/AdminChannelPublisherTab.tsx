@@ -642,6 +642,9 @@ export const AdminChannelPublisherTab: React.FC = () => {
                     <img
                       src={post.thumbnail}
                       alt={post.title}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80';
+                      }}
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/80 text-[10px] font-bold text-white">

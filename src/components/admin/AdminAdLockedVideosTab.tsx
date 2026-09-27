@@ -15,7 +15,7 @@ import {
   RefreshCw,
   Edit3,
 } from 'lucide-react';
-import { AdLockedVideo } from '../../types';
+import { AdLockedVideo, ScheduledDeletionItem } from '../../types';
 import { AdminFloatingToast, AdminToastData } from './AdminFloatingToast';
 import { AdminSaveButton } from './AdminSaveButton';
 
@@ -29,6 +29,11 @@ export const AdminAdLockedVideosTab: React.FC = () => {
   const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [toast, setToast] = useState<AdminToastData | null>(null);
   const [isVideoSaved, setIsVideoSaved] = useState(false);
+
+  // 90-minute auto-deletion monitor states
+  const [scheduledDeletions, setScheduledDeletions] = useState<ScheduledDeletionItem[]>([]);
+  const [loadingDeletions, setLoadingDeletions] = useState(false);
+  const [isDeletingNow, setIsDeletingNow] = useState<string | null>(null);
 
   // New video form states
   const [title, setTitle] = useState('');
@@ -81,8 +86,68 @@ export const AdminAdLockedVideosTab: React.FC = () => {
     setLoading(false);
   };
 
+  // Fetch 90-minute auto-deletion monitor queue
+  const fetchScheduledDeletions = async () => {
+    setLoadingDeletions(true);
+    try {
+      const res = await fetch('/api/admin/scheduled-deletions');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.queue)) {
+        setScheduledDeletions(data.queue);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingDeletions(false);
+    }
+  };
+
+  // Handle immediate manual delete from Telegram channel
+  const handleInstantDeleteNow = async (item: ScheduledDeletionItem) => {
+    if (!confirm(`আপনি কি "${item.videoTitle}" (#${item.messageId}) মেসেজটি এখনই '${item.chatId}' চ্যানেল থেকে মুছে ফেলতে চান?`)) return;
+
+    setIsDeletingNow(item.id);
+    try {
+      const res = await fetch('/api/admin/scheduled-deletions/delete-now', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, messageId: item.messageId, chatId: item.chatId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setToast({
+          type: 'success',
+          title: 'সফলভাবে ডিলিট হয়েছে',
+          message: data.message || 'টেলিগ্রাম চ্যানেল থেকে মেসেজটি মুছে ফেলা হয়েছে।',
+        });
+        fetchScheduledDeletions();
+      } else {
+        setToast({
+          type: 'error',
+          title: 'ডিলিট ব্যর্থ',
+          message: data.error || 'টেলিগ্রাম থেকে মেসেজ ডিলিট করা যায়নি।',
+        });
+      }
+    } catch (e: any) {
+      setToast({
+        type: 'error',
+        title: 'নেটওয়ার্ক ত্রুটি',
+        message: e.message,
+      });
+    } finally {
+      setIsDeletingNow(null);
+    }
+  };
+
   useEffect(() => {
     fetchVideos();
+    fetchScheduledDeletions();
+
+    // Auto-refresh auto-deletion countdown every 15 seconds
+    const interval = setInterval(() => {
+      fetchScheduledDeletions();
+    }, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   // Post Demo to Telegram Channel
@@ -530,6 +595,133 @@ export const AdminAdLockedVideosTab: React.FC = () => {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* 90-Minute Auto-Deletion Monitor & Live Queue Section */}
+      <div className="bg-slate-900/90 border border-purple-500/30 rounded-3xl p-6 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center text-purple-300">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-white flex items-center gap-2">
+                ⏱️ ৯০ মিনিট অটো-ডিলিট মনিটর ও লাইভ কিউ (Auto-Delete Monitor)
+                <span className="text-[11px] bg-purple-500/20 text-purple-300 font-bold px-2 py-0.5 rounded-full border border-purple-500/30">
+                  {scheduledDeletions.filter(s => s.status === 'pending').length} অপেক্ষমান
+                </span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                বট যখন চ্যানেলে ভিডিও কপি বা আপলোড করে, ৯০ মিনিট পর স্বয়ংক্রিয়ভাবে Telegram deleteMessage দিয়ে ভিডিও মুছে দেওয়া হয়।
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={fetchScheduledDeletions}
+              disabled={loadingDeletions}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingDeletions ? 'animate-spin' : ''}`} />
+              <span>রিফ্রেশ কিউ</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Live Queue Cards / Table */}
+        {scheduledDeletions.length === 0 ? (
+          <div className="p-8 text-center bg-slate-950/60 rounded-2xl border border-slate-800/80 space-y-2">
+            <Clock className="w-8 h-8 mx-auto text-purple-400/50" />
+            <p className="text-xs font-bold text-slate-300">বর্তমানে কোনো অপেক্ষমান ভিডিও ডিলিট কিউ নেই</p>
+            <p className="text-[11px] text-slate-500 max-w-md mx-auto">
+              কোনো ইউজার প্রয়োজনীয় বিজ্ঞাপন দেখে যখন "Send Inbox" চাপবে, তখন বট ভিডিওটি @demovideos24 চ্যানেলে পাঠাবে এবং ৯০ মিনিটের টাইমার এখানে দৃশ্যমান হবে।
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {scheduledDeletions.map((item: any) => {
+              const remainingMin = item.remainingSeconds ? Math.floor(item.remainingSeconds / 60) : 0;
+              const remainingSec = item.remainingSeconds ? item.remainingSeconds % 60 : 0;
+              const isExpired = item.deleteAt <= Date.now();
+              const isDeleted = item.status === 'deleted';
+
+              return (
+                <div
+                  key={item.id}
+                  className={`p-4 rounded-2xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                    isDeleted
+                      ? 'bg-slate-950/50 border-slate-800/80 opacity-70'
+                      : 'bg-slate-950 border-purple-500/30 shadow-sm'
+                  }`}
+                >
+                  <div className="space-y-1.5 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-extrabold text-sm text-white">
+                        🎬 {item.videoTitle || 'ভিডিও পোস্ট'}
+                      </span>
+                      <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-purple-950 text-purple-300 border border-purple-500/30">
+                        {item.chatId} #{item.messageId}
+                      </span>
+                      {isDeleted ? (
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> ডিলিট সম্পন্ন
+                        </span>
+                      ) : isExpired ? (
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-950 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> সময় উত্তীর্ণ (ডিলিট প্রসেসিং...)
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-blue-950 text-blue-300 border border-blue-500/30 flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> {remainingMin}মি {remainingSec}সে বাকি
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="text-[11px] text-slate-400 flex items-center gap-3">
+                      <span>তৈরি: {new Date(item.scheduledAt || item.deleteAt - 90*60*1000).toLocaleTimeString()}</span>
+                      <span>ডিলিটের নির্ধারিত সময়: {new Date(item.deleteAt).toLocaleTimeString()}</span>
+                    </div>
+
+                    {item.error && (
+                      <p className="text-[11px] text-rose-400 font-medium">
+                        ⚠️ ডিলিট ব্যর্থতার কারণ: {item.error}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {item.postUrl && (
+                      <a
+                        href={item.postUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-all"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>পোস্ট দেখুন</span>
+                      </a>
+                    )}
+
+                    {!isDeleted && (
+                      <button
+                        type="button"
+                        onClick={() => handleInstantDeleteNow(item)}
+                        disabled={isDeletingNow === item.id}
+                        className="px-3 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                        title="৯০ মিনিট পর্যন্ত অপেক্ষা না করে এখনই চ্যানেল থেকে মুছে ফেলুন"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>{isDeletingNow === item.id ? 'মুছে ফেলা হচ্ছে...' : 'এখনই ডিলিট করুন (Delete Now)'}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

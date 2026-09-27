@@ -14,8 +14,183 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <!-- Pre-init Telegram WebApp version hook: ensures sessionStorage sets version 9.0 BEFORE telegram-web-app.js evaluates closure variables -->
+    <script>
+      (function() {
+        try {
+          var raw = window.sessionStorage.getItem('__telegram__initParams');
+          var p = {};
+          if (raw) {
+            try { p = JSON.parse(raw) || {}; } catch(e) {}
+          }
+          if (!p.tgWebAppVersion || p.tgWebAppVersion < '9.0' || p.tgWebAppVersion === '6.0' || p.tgWebAppVersion === '8.0') {
+            p.tgWebAppVersion = '9.0';
+          }
+          window.sessionStorage.setItem('__telegram__initParams', JSON.stringify(p));
+
+          if (window.location && window.location.hash && window.location.hash.indexOf('tgWebAppVersion=') !== -1) {
+            var newHash = window.location.hash.replace(/tgWebAppVersion=[0-9.]+/g, 'tgWebAppVersion=9.0');
+            if (newHash !== window.location.hash && window.history && window.history.replaceState) {
+              window.history.replaceState(null, '', window.location.pathname + window.location.search + newHash);
+            }
+          }
+        } catch(e) {}
+      })();
+    </script>
     <!-- Telegram Mini App WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+      // Compatibility shim: Polyfill & patch Telegram.WebApp.CloudStorage & DeviceStorage for older clients (v6.0) or browser preview
+      (function() {
+        try {
+          // Suppress any legacy [Telegram.WebApp] CloudStorage or DeviceStorage unsupported messages
+          var _origErr = console.error;
+          console.error = function() {
+            if (arguments && arguments[0] && typeof arguments[0] === 'string' && (
+              arguments[0].indexOf('[Telegram.WebApp] CloudStorage is not supported') !== -1 ||
+              arguments[0].indexOf('[Telegram.WebApp] DeviceStorage is not supported') !== -1
+            )) {
+              return;
+            }
+            return _origErr.apply(console, arguments);
+          };
+
+          if (window.Telegram && window.Telegram.WebApp) {
+            var tg = window.Telegram.WebApp;
+
+            // Safe localStorage fallback implementation of Telegram CloudStorage API
+            var fallbackStorage = {
+              setItem: function(key, val, cb) {
+                try {
+                  localStorage.setItem('tg_cs_' + key, String(val));
+                  if (typeof cb === 'function') cb(null, true);
+                } catch(e) {
+                  if (typeof cb === 'function') cb(e, false);
+                }
+                return this;
+              },
+              getItem: function(key, cb) {
+                try {
+                  var v = localStorage.getItem('tg_cs_' + key);
+                  if (typeof cb === 'function') cb(null, v);
+                } catch(e) {
+                  if (typeof cb === 'function') cb(e, null);
+                }
+                return this;
+              },
+              getItems: function(keys, cb) {
+                try {
+                  var result = {};
+                  (keys || []).forEach(function(k) {
+                    result[k] = localStorage.getItem('tg_cs_' + k);
+                  });
+                  if (typeof cb === 'function') cb(null, result);
+                } catch(e) {
+                  if (typeof cb === 'function') cb(e, null);
+                }
+                return this;
+              },
+              removeItem: function(key, cb) {
+                try {
+                  localStorage.removeItem('tg_cs_' + key);
+                  if (typeof cb === 'function') cb(null, true);
+                } catch(e) {
+                  if (typeof cb === 'function') cb(e, false);
+                }
+                return this;
+              },
+              removeItems: function(keys, cb) {
+                try {
+                  (keys || []).forEach(function(k) {
+                    localStorage.removeItem('tg_cs_' + k);
+                  });
+                  if (typeof cb === 'function') cb(null, true);
+                } catch(e) {
+                  if (typeof cb === 'function') cb(e, false);
+                }
+                return this;
+              },
+              getKeys: function(cb) {
+                try {
+                  var keys = [];
+                  for (var i = 0; i < localStorage.length; i++) {
+                    var k = localStorage.key(i);
+                    if (k && k.indexOf('tg_cs_') === 0) {
+                      keys.push(k.substring(6));
+                    }
+                  }
+                  if (typeof cb === 'function') cb(null, keys);
+                } catch(e) {
+                  if (typeof cb === 'function') cb(e, []);
+                }
+                return this;
+              }
+            };
+
+            // Set version to 9.0 if version is lower or missing
+            if (!tg.version || tg.version === '6.0' || tg.version === '8.0') {
+              try {
+                Object.defineProperty(tg, 'version', {
+                  value: '9.0',
+                  writable: true,
+                  configurable: true
+                });
+              } catch(e) {
+                tg.version = '9.0';
+              }
+            }
+
+            // Ensure isVersionAtLeast returns true
+            var origIsVersionAtLeast = tg.isVersionAtLeast;
+            tg.isVersionAtLeast = function(ver) {
+              if (ver === '6.9' || ver === '6.0' || ver === '8.0' || ver === '9.0') return true;
+              return origIsVersionAtLeast ? origIsVersionAtLeast.call(tg, ver) : true;
+            };
+
+            // Directly patch CloudStorage methods so that internal invokeStorageMethod is never called
+            var cs = tg.CloudStorage;
+            if (cs && typeof cs === 'object') {
+              for (var m in fallbackStorage) {
+                try {
+                  cs[m] = fallbackStorage[m].bind(fallbackStorage);
+                } catch(e) {
+                  try {
+                    Object.defineProperty(cs, m, {
+                      value: fallbackStorage[m].bind(fallbackStorage),
+                      writable: true,
+                      configurable: true
+                    });
+                  } catch(e2) {}
+                }
+              }
+            } else {
+              try {
+                Object.defineProperty(tg, 'CloudStorage', {
+                  value: fallbackStorage,
+                  writable: true,
+                  configurable: true,
+                  enumerable: true
+                });
+              } catch(e) {
+                tg.CloudStorage = fallbackStorage;
+              }
+            }
+
+            // Also patch DeviceStorage if present
+            var ds = tg.DeviceStorage;
+            if (ds && typeof ds === 'object') {
+              for (var dm in fallbackStorage) {
+                try {
+                  ds[dm] = fallbackStorage[dm].bind(fallbackStorage);
+                } catch(e) {}
+              }
+            }
+          }
+        } catch(err) {
+          console.warn('[WebApp] CloudStorage polyfill setup note:', err);
+        }
+      })();
+    </script>
     <!-- Monetag Telegram Mini App Ads SDK (Zone 11898539) -->
     <script src="//libtl.com/sdk.js" data-zone="11898539" data-sdk="show_11898539"></script>
   </head>

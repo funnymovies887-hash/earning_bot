@@ -326,12 +326,9 @@ if (!fs.existsSync(path.join(DATA_DIR, "user_video_sessions.json"))) {
 // Digital Packages & Store Orders State with Disk Persistence
 let deletedPackageIds: string[] = loadJsonFile("deleted_package_ids.json", []);
 let serverPackages = loadJsonFile("packages.json", [...INITIAL_DIGITAL_PACKAGES]);
-if (deletedPackageIds.length > 0) {
-  serverPackages = serverPackages.filter((p) => !deletedPackageIds.includes(p.id));
-}
-if (!fs.existsSync(path.join(DATA_DIR, "packages.json"))) {
-  saveJsonFile("packages.json", serverPackages);
-}
+const DEMO_PACKAGE_IDS = ["pkg-1", "pkg-2", "pkg-3"];
+serverPackages = serverPackages.filter((p) => p && p.id && !DEMO_PACKAGE_IDS.includes(p.id) && !deletedPackageIds.includes(p.id));
+saveJsonFile("packages.json", serverPackages);
 
 // Channel Posts Published via Channel Post Publisher
 let serverChannelPosts: any[] = loadJsonFile("channel_posts.json", []);
@@ -354,15 +351,40 @@ interface ScheduledVideoDeletion {
 }
 let scheduledDeletions: ScheduledVideoDeletion[] = loadJsonFile("scheduled_deletions.json", []);
 
+function escapeTgHtml(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function formatTelegramChatTarget(chatInput: string): string {
+  let target = (chatInput || "@demovideos24").trim();
+  if (target.startsWith("https://t.me/")) {
+    target = target.replace("https://t.me/", "").split("/")[0].replace("/", "").trim();
+  }
+  // If numeric ID (positive user id or negative channel/group id)
+  if (/^-?\d+$/.test(target)) {
+    return target;
+  }
+  if (!target.startsWith("@") && !target.startsWith("-")) {
+    return "@" + target;
+  }
+  return target;
+}
+
 async function executeTelegramDeleteMessage(chatId: string, messageId: number, customToken?: string): Promise<{ success: boolean; error?: string }> {
   const token = customToken || telegramConfig.botToken || process.env.TELEGRAM_BOT_TOKEN;
   if (!token) return { success: false, error: "No bot token configured" };
+
+  const target = formatTelegramChatTarget(chatId);
 
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, message_id: messageId }),
+      body: JSON.stringify({ chat_id: target, message_id: messageId }),
     });
     const data: any = await res.json();
     if (data.ok) {
@@ -370,7 +392,7 @@ async function executeTelegramDeleteMessage(chatId: string, messageId: number, c
     }
 
     // If chat_id was @demovideos24 and it failed, try numeric ID -1004305683246
-    if (chatId === "@demovideos24" || chatId === "demovideos24") {
+    if (target === "@demovideos24" || target === "demovideos24") {
       const fallbackRes = await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -395,7 +417,7 @@ async function executeTelegramDeleteMessage(chatId: string, messageId: number, c
 
 async function cleanupExpiredTelegramVideos() {
   const token = telegramConfig.botToken || process.env.TELEGRAM_BOT_TOKEN;
-  if (!token || scheduledDeletions.length === 0) return;
+  if (scheduledDeletions.length === 0) return;
 
   const now = Date.now();
   let modified = false;
@@ -404,11 +426,31 @@ async function cleanupExpiredTelegramVideos() {
     if (item.status === 'deleted') continue;
 
     if (item.deleteAt <= now) {
-      console.log(`[AutoDelete] Deleting expired video message ${item.messageId} from channel ${item.chatId} ("${item.videoTitle}")`);
-      const delResult = await executeTelegramDeleteMessage(item.chatId, item.messageId, item.botToken || token);
+      const tokenToUse = item.botToken || token;
+      if (!tokenToUse) continue;
+
+      console.log(`[AutoDelete] Deleting expired video message ${item.messageId} from chat/channel ${item.chatId} ("${item.videoTitle}")`);
+      const delResult = await executeTelegramDeleteMessage(item.chatId, item.messageId, tokenToUse);
       if (delResult.success) {
         item.status = 'deleted';
         modified = true;
+
+        // Immediately send follow-up message notifying that the video expired and was deleted
+        try {
+          const target = formatTelegramChatTarget(item.chatId);
+          await fetch(`https://api.telegram.org/bot${tokenToUse}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: target,
+              text: `⏱️ <b>ভিডিওটির সময় সমাপ্ত!</b>\n\n🎬 <b>"${escapeTgHtml(item.videoTitle)}"</b> সম্পূর্ণ ফুল ভিডিওটির ৯০ মিনিটের নির্ধারিত সময় শেষ হওয়ায় এটি স্বয়ংক্রিয়ভাবে মুছে ফেলা হয়েছে।\n\n🚀 পুনরায় যেকোনো ভিডিও বা কোর্স আনলক করতে আমাদের মিনি অ্যাপে প্রবেশ করুন!`,
+              parse_mode: "HTML",
+            }),
+          });
+          console.log(`[AutoDelete] Sent follow-up deletion notification to ${target}`);
+        } catch (msgErr: any) {
+          console.warn("[AutoDelete] Follow-up notification error:", msgErr.message);
+        }
       } else {
         item.status = 'failed';
         item.error = delResult.error;
@@ -426,9 +468,9 @@ async function cleanupExpiredTelegramVideos() {
   }
 }
 
-// Check every 30 seconds for expired video deletion
-setInterval(cleanupExpiredTelegramVideos, 30 * 1000);
-setTimeout(cleanupExpiredTelegramVideos, 3000);
+// Check every 15 seconds for expired video deletion
+setInterval(cleanupExpiredTelegramVideos, 15 * 1000);
+setTimeout(cleanupExpiredTelegramVideos, 2000);
 
 
 let serverOrders = loadJsonFile("orders.json", [...INITIAL_PACKAGE_ORDERS]);
@@ -1927,14 +1969,8 @@ async function startServer() {
       return res.status(400).json({ error: "⚠️ কোনো Telegram Bot Token সেট করা নেই। এডমিন প্যানেলে বট টোকেন সেভ করুন।" });
     }
 
-    // Target Channel: user explicitly specified demo video channel: @demovideos24
-    let targetChat = video.channelId ? video.channelId.trim() : "@demovideos24";
-    if (targetChat.startsWith("https://t.me/")) {
-      targetChat = "@" + targetChat.replace("https://t.me/", "").split("/")[0].replace("/", "");
-    }
-    if (!targetChat.startsWith("@") && !targetChat.startsWith("-")) {
-      targetChat = "@" + targetChat;
-    }
+    // Target Channel: user specified channel or default @demovideos24
+    const targetChat = formatTelegramChatTarget(video.channelId || "@demovideos24");
 
     const caption = `🎬 **${video.title}** (সম্পূর্ণ ফুল ভিডিও)\n\n⏱️ **এই ভিডিওটি আগামী ৯০ মিনিটের জন্য চ্যানেলে থাকবে এবং ৯০ মিনিট পর স্বয়ংক্রিয়ভাবে মুছে যাবে!**\n\n🛡️ *ডাউনলোড ও ফরওয়ার্ডিং নিষিদ্ধ (Protected Content)*`;
 
@@ -2257,14 +2293,6 @@ async function startServer() {
   // CHANNEL POST PUBLISHER APIS
   // ==========================================
 
-  function escapeTgHtml(text: string): string {
-    if (!text) return "";
-    return text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-  }
-
   // Admin: Get published channel posts
   app.get("/api/admin/channel-publisher/posts", (_req, res) => {
     res.json({ success: true, posts: serverChannelPosts });
@@ -2292,13 +2320,7 @@ async function startServer() {
       return res.status(400).json({ error: "⚠️ টেলিগ্রাম বট টোকেন কনফিগার করা নেই। এডমিন প্যানেলে বট টোকেন সেভ করুন।" });
     }
 
-    let targetChat = targetChannel ? targetChannel.trim() : "@demovideos24";
-    if (targetChat.startsWith("https://t.me/")) {
-      targetChat = "@" + targetChat.replace("https://t.me/", "").split("/")[0].replace("/", "");
-    }
-    if (!targetChat.startsWith("@") && !targetChat.startsWith("-")) {
-      targetChat = "@" + targetChat;
-    }
+    const targetChat = formatTelegramChatTarget(targetChannel || "@demovideos24");
 
     // Build 3 inline buttons as explicitly specified by the user:
     // Button 1: “👀 Watch Demo”
@@ -2999,6 +3021,7 @@ async function startServer() {
       if (Array.isArray(data.packages) && data.packages.length > 0) {
         for (const incomingPkg of data.packages) {
           if (!incomingPkg || !incomingPkg.id) continue;
+          if (DEMO_PACKAGE_IDS.includes(incomingPkg.id)) continue; // NEVER resurrect demo packages!
           if (deletedPackageIds.includes(incomingPkg.id)) continue; // NEVER resurrect deleted packages!
           const existingIdx = serverPackages.findIndex(
             (p) => p.id === incomingPkg.id || (p.title && p.title.trim().toLowerCase() === incomingPkg.title?.trim().toLowerCase())

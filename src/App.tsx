@@ -48,6 +48,7 @@ import { NotificationInboxModal, NotificationItem } from './components/Notificat
 import { Headphones, Bell, X, Check, ArrowRight, Gift, ShieldAlert, Sparkles, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
+import { initMonetagInAppAds } from './utils/monetag';
 
 function getInitialTelegramUser() {
   try {
@@ -257,6 +258,13 @@ export default function App() {
         }
       })
       .catch(() => {});
+
+    // Initialize Monetag In-App Interstitial for regular users (strictly suppressed if admin)
+    const adTimer = setTimeout(() => {
+      initMonetagInAppAds();
+    }, 2500);
+
+    return () => clearTimeout(adTimer);
   }, []);
 
   // Handle Telegram startapp deep links (e.g. video_lock-vid-1 from channel 'Watch Full Video' button)

@@ -57,7 +57,10 @@ export const DigitalStoreModal: React.FC<DigitalStoreModalProps> = ({
       const cached = localStorage.getItem('earn_digital_packages');
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const clean = parsed.filter((p: any) => p && !['pkg-1', 'pkg-2', 'pkg-3'].includes(p.id));
+          if (clean.length > 0) return clean;
+        }
       }
     } catch {}
     return INITIAL_DIGITAL_PACKAGES;
@@ -131,9 +134,10 @@ export const DigitalStoreModal: React.FC<DigitalStoreModalProps> = ({
       ]);
 
       if (Array.isArray(pkgData)) {
-        setPackages(pkgData);
+        const clean = pkgData.filter((p: any) => p && !['pkg-1', 'pkg-2', 'pkg-3'].includes(p.id));
+        setPackages(clean);
         try {
-          localStorage.setItem('earn_digital_packages', JSON.stringify(pkgData));
+          localStorage.setItem('earn_digital_packages', JSON.stringify(clean));
         } catch {}
       }
       if (Array.isArray(ordData)) {
@@ -375,8 +379,11 @@ export const DigitalStoreModal: React.FC<DigitalStoreModalProps> = ({
                         <div className="flex items-start gap-3">
                           <div className="relative shrink-0">
                             <img
-                              src={pkg.thumbnail}
+                              src={pkg.thumbnail || 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=500&auto=format&fit=crop&q=60'}
                               alt={pkg.title}
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=500&auto=format&fit=crop&q=60';
+                              }}
                               className="w-20 h-20 rounded-xl object-cover border border-slate-700 group-hover:border-purple-400 transition-colors"
                             />
                             <span className="absolute bottom-1 right-1 bg-black/80 text-[9px] font-bold text-amber-300 px-1.5 py-0.5 rounded flex items-center gap-0.5 shadow-sm">
@@ -571,8 +578,11 @@ export const DigitalStoreModal: React.FC<DigitalStoreModalProps> = ({
                 {/* Product Banner */}
                 <div className="relative rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-lg">
                   <img
-                    src={selectedDetailPkg.thumbnail}
+                    src={selectedDetailPkg.thumbnail || 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=500&auto=format&fit=crop&q=60'}
                     alt={selectedDetailPkg.title}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=500&auto=format&fit=crop&q=60';
+                    }}
                     className="w-full h-44 sm:h-52 object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
@@ -783,8 +793,11 @@ export const DigitalStoreModal: React.FC<DigitalStoreModalProps> = ({
                 {/* Selected Package Header */}
                 <div className="bg-slate-800/80 border border-purple-500/40 rounded-2xl p-3.5 flex items-center gap-3">
                   <img
-                    src={checkoutPkg.thumbnail}
+                    src={checkoutPkg.thumbnail || 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=500&auto=format&fit=crop&q=60'}
                     alt={checkoutPkg.title}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=500&auto=format&fit=crop&q=60';
+                    }}
                     className="w-14 h-14 rounded-xl object-cover border border-slate-700 shrink-0"
                   />
                   <div>
