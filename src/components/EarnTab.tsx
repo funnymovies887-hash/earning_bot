@@ -69,6 +69,8 @@ export const EarnTab: React.FC<EarnTabProps> = ({
     destinationUrl?: string;
     channelUrl?: string;
     channelHandle?: string;
+    thumbnailUrl?: string;
+    mediaUrl?: string;
     target?: number;
     rawItem?: any;
   } | null>(null);
@@ -372,6 +374,7 @@ export const EarnTab: React.FC<EarnTabProps> = ({
               </div>
               {currentCategoryTasks.map((task) => {
                 const isCompleted = user.completedTaskIds?.includes(task.id);
+                const taskThumb = task.mediaUrl || task.thumbnailUrl || task.thumbnail;
                 return (
                   <div
                     key={task.id}
@@ -383,6 +386,8 @@ export const EarnTab: React.FC<EarnTabProps> = ({
                       rewardUsd: task.rewardUsd,
                       rewardBdt: task.rewardBdt,
                       timerSeconds: task.timerSeconds || 15,
+                      thumbnailUrl: taskThumb,
+                      mediaUrl: taskThumb,
                       instructions: task.instructions || 'ভিডিও বিজ্ঞাপনটি ১৫ সেকেন্ড দেখুন এবং পুরো টাকা অ্যাকাউন্টে যোগ করে নিন।',
                       description: 'Adsterra / Monetag স্পনসরড বিজ্ঞাপন। ভিডিওটি সম্পূর্ণ সময় দেখে কোনো ক্লোজ না করে অপেক্ষা করুন। সময় শেষে ব্যালেন্সে টাকা জমা হবে।',
                       destinationUrl: task.destinationUrl,
@@ -392,15 +397,28 @@ export const EarnTab: React.FC<EarnTabProps> = ({
                     title="ক্লিক করে কাজের বিস্তারিত বিবরণ দেখুন"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
-                        {task.mediaType === 'video' ? (
-                          <Video className="w-5 h-5" />
-                        ) : task.mediaType === 'image' ? (
-                          <ImageIcon className="w-5 h-5" />
-                        ) : (
-                          <Play className="w-5 h-5" />
-                        )}
-                      </div>
+                      {taskThumb ? (
+                        <div className="w-11 h-11 rounded-xl overflow-hidden border border-amber-500/40 bg-slate-950 shrink-0 flex items-center justify-center">
+                          <img
+                            src={taskThumb}
+                            alt={task.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                          {task.mediaType === 'video' ? (
+                            <Video className="w-5 h-5" />
+                          ) : task.mediaType === 'image' ? (
+                            <ImageIcon className="w-5 h-5" />
+                          ) : (
+                            <Play className="w-5 h-5" />
+                          )}
+                        </div>
+                      )}
                       <div>
                         <div className="flex items-center gap-2">
                           <h4 className="text-xs font-extrabold text-white group-hover:text-amber-300 transition-colors">{task.title}</h4>
@@ -472,6 +490,7 @@ export const EarnTab: React.FC<EarnTabProps> = ({
             const duration = job.timerSeconds || job.durationSeconds || 15;
             const rewardUsd = job.rewardUsd || (job.rewardBdt ? job.rewardBdt / 120 : 0.02);
             const rewardBdt = job.rewardBdt || +(rewardUsd * 120).toFixed(2);
+            const jobThumb = job.mediaUrl || job.thumbnailUrl || job.thumbnail;
 
             return (
               <div
@@ -484,6 +503,8 @@ export const EarnTab: React.FC<EarnTabProps> = ({
                   rewardUsd,
                   rewardBdt,
                   timerSeconds: duration,
+                  thumbnailUrl: jobThumb,
+                  mediaUrl: jobThumb,
                   instructions: job.instructions || 'ওয়েবসাইটটিতে প্রবেশ করুন এবং ১৫-৩০ সেকেন্ড স্ক্রোল করে পেজের বিষয়বস্তু দেখুন। কাউন্টডাউন শেষ হলে ব্যালেন্সে টাকা জমা হবে।',
                   description: 'হাই-সিপিএম স্পনসরড ওয়েব ভিজিট টাস্ক। নির্ধারিত সময় পেজে অবস্থান করলে বিজ্ঞাপনদাতাদের মাধ্যমে ভেরিফিকেশন সম্পন্ন হবে এবং আপনার ওয়ালেটে সরাসরি টাকা জমা হবে।',
                   destinationUrl: job.destinationUrl || 'https://www.profitablecpmrate.com/direct-link-visit',
@@ -493,17 +514,30 @@ export const EarnTab: React.FC<EarnTabProps> = ({
                 title="ক্লিক করে কাজের বিস্তারিত বিবরণ দেখুন"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                    {job.mediaType === 'image' ? (
-                      <ImageIcon className="w-5 h-5" />
-                    ) : job.mediaType === 'video' ? (
-                      <Video className="w-5 h-5" />
-                    ) : job.mediaType === 'file' ? (
-                      <FileText className="w-5 h-5" />
-                    ) : (
-                      <Globe className="w-5 h-5" />
-                    )}
-                  </div>
+                  {jobThumb ? (
+                    <div className="w-11 h-11 rounded-xl overflow-hidden border border-purple-500/40 bg-slate-950 shrink-0 flex items-center justify-center">
+                      <img
+                        src={jobThumb}
+                        alt={job.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      {job.mediaType === 'image' ? (
+                        <ImageIcon className="w-5 h-5" />
+                      ) : job.mediaType === 'video' ? (
+                        <Video className="w-5 h-5" />
+                      ) : job.mediaType === 'file' ? (
+                        <FileText className="w-5 h-5" />
+                      ) : (
+                        <Globe className="w-5 h-5" />
+                      )}
+                    </div>
+                  )}
                   <div>
                     <div className="flex items-center gap-2">
                       <h4 className="text-xs font-extrabold text-white group-hover:text-purple-300 transition-colors">{job.title}</h4>
@@ -580,6 +614,7 @@ export const EarnTab: React.FC<EarnTabProps> = ({
             const isCompleted = user.completedTaskIds?.includes(tgTask.id);
             const rewardUsd = tgTask.rewardUsd || (tgTask.rewardBdt ? tgTask.rewardBdt / 120 : 0.03);
             const rewardBdt = tgTask.rewardBdt || +(rewardUsd * 120).toFixed(2);
+            const tgThumb = tgTask.mediaUrl || tgTask.thumbnailUrl || tgTask.thumbnail;
 
             return (
               <div
@@ -592,6 +627,8 @@ export const EarnTab: React.FC<EarnTabProps> = ({
                   rewardUsd,
                   rewardBdt,
                   timerSeconds: 5,
+                  thumbnailUrl: tgThumb,
+                  mediaUrl: tgThumb,
                   instructions: tgTask.instructions || 'টেলিগ্রাম চ্যানেলে জয়েন করুন, চ্যানেলটি মিউট করবেন না এবং কমপক্ষে ৭ দিন চ্যানেলের সদস্য থাকুন। জয়েন করার পর ক্লেইম বাটনে চাপ দিলে ব্যালেন্স যোগ হবে।',
                   description: 'অফিসিয়াল টেলিগ্রাম পার্টনার কমিউনিটি। এখানে বিভিন্ন আর্নিং আপডেট, পেমেন্ট প্রুফ ও নিয়মিত গিভঅ্যাওয়ে শেয়ার করা হয়।',
                   destinationUrl: tgTask.channelUrl || tgTask.destinationUrl || 'https://t.me/',
@@ -601,9 +638,22 @@ export const EarnTab: React.FC<EarnTabProps> = ({
                 title="ক্লিক করে কাজের বিস্তারিত বিবরণ দেখুন"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                    <Send className="w-5 h-5" />
-                  </div>
+                  {tgThumb ? (
+                    <div className="w-11 h-11 rounded-xl overflow-hidden border border-sky-500/40 bg-slate-950 shrink-0 flex items-center justify-center">
+                      <img
+                        src={tgThumb}
+                        alt={tgTask.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <Send className="w-5 h-5" />
+                    </div>
+                  )}
                   <div>
                     <h4 className="text-xs font-extrabold text-white group-hover:text-sky-300 transition-colors">{tgTask.title}</h4>
                     <p className="text-[10px] text-slate-400">{tgTask.instructions || 'চ্যানেলে জয়েন করে রিওয়ার্ড ক্লেইম করুন'}</p>
@@ -655,6 +705,7 @@ export const EarnTab: React.FC<EarnTabProps> = ({
             const isCompleted = user.completedTaskIds?.includes(mission.id);
             const rewardUsd = mission.rewardUsd || (mission.rewardBdt ? mission.rewardBdt / 120 : 0.05);
             const rewardBdt = mission.rewardBdt || +(rewardUsd * 120).toFixed(2);
+            const missionThumb = mission.mediaUrl || mission.thumbnailUrl || mission.thumbnail;
 
             return (
               <div
@@ -667,6 +718,8 @@ export const EarnTab: React.FC<EarnTabProps> = ({
                   rewardUsd,
                   rewardBdt,
                   target: mission.target || 10,
+                  thumbnailUrl: missionThumb,
+                  mediaUrl: missionThumb,
                   instructions: 'আজকের দিনের নির্ধারিত লক্ষ্য পূরণ করুন (যেমন ১০টি বিজ্ঞাপন দেখা বা বন্ধুদের ইনভাইট করা)। লক্ষ্য অর্জনের সাথে সাথে বোনাস বাটনে চাপ দিয়ে এক্সট্রা রিওয়ার্ড বুঝে নিন।',
                   description: 'দৈনিক অ্যাক্টিভিটি বোনাস প্রোগ্রাম। নিয়মিত সক্রিয় ইউজারদের জন্য প্রতিদিন অতিরিক্ত ইনকামের বিশেষ সুযোগ।',
                   rawItem: mission,
@@ -675,9 +728,22 @@ export const EarnTab: React.FC<EarnTabProps> = ({
                 title="ক্লিক করে কাজের বিস্তারিত বিবরণ দেখুন"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                    <Target className="w-5 h-5" />
-                  </div>
+                  {missionThumb ? (
+                    <div className="w-11 h-11 rounded-xl overflow-hidden border border-emerald-500/40 bg-slate-950 shrink-0 flex items-center justify-center">
+                      <img
+                        src={missionThumb}
+                        alt={mission.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <Target className="w-5 h-5" />
+                    </div>
+                  )}
                   <div>
                     <h4 className="text-xs font-extrabold text-white group-hover:text-emerald-300 transition-colors">{mission.title}</h4>
                     <div className="flex items-center gap-2 mt-0.5 text-[11px]">
@@ -748,6 +814,7 @@ export const EarnTab: React.FC<EarnTabProps> = ({
                 const isCompleted = user.completedTaskIds?.includes(refTask.id);
                 const rewardUsd = refTask.rewardUsd || 0.1;
                 const rewardBdt = refTask.rewardBdt || +(rewardUsd * 120).toFixed(2);
+                const refThumb = refTask.mediaUrl || refTask.thumbnailUrl || refTask.thumbnail;
                 return (
                   <div
                     key={refTask.id}
@@ -758,6 +825,8 @@ export const EarnTab: React.FC<EarnTabProps> = ({
                       subCategory: 'রেফারেল ও আমন্ত্রণ মিশন',
                       rewardUsd,
                       rewardBdt,
+                      thumbnailUrl: refThumb,
+                      mediaUrl: refThumb,
                       instructions: 'আপনার ইউনিক রেফারেল লিংকটি বন্ধুদের সাথে মেসেঞ্জার, হোয়াটসঅ্যাপ বা ফেসবুকে শেয়ার করুন। বন্ধু লিংকে ক্লিক করে অ্যাপ ব্যবহার শুরু করলে বোনাস পাবেন।',
                       description: 'রেফারেল ক্যাম্পেইন। আপনার রেফার লিংকের মাধ্যমে বন্ধুদের অ্যাপে নিয়ে আসুন এবং নির্ধারিত বোনাস সরাসরি উইথড্র ব্যালেন্সে গ্রহণ করুন।',
                       rawItem: refTask,
@@ -766,9 +835,22 @@ export const EarnTab: React.FC<EarnTabProps> = ({
                     title="ক্লিক করে কাজের বিস্তারিত বিবরণ দেখুন"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                        <Users className="w-5 h-5" />
-                      </div>
+                      {refThumb ? (
+                        <div className="w-11 h-11 rounded-xl overflow-hidden border border-pink-500/40 bg-slate-950 shrink-0 flex items-center justify-center">
+                          <img
+                            src={refThumb}
+                            alt={refTask.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                          <Users className="w-5 h-5" />
+                        </div>
+                      )}
                       <div>
                         <h5 className="text-xs font-extrabold text-white group-hover:text-pink-300 transition-colors">{refTask.title}</h5>
                         <div className="flex items-center gap-2 mt-0.5 text-[11px]">
@@ -850,6 +932,20 @@ export const EarnTab: React.FC<EarnTabProps> = ({
                 <X className="w-4 h-4" />
               </button>
             </div>
+
+            {/* Thumbnail Banner */}
+            {(selectedDetailTask.thumbnailUrl || selectedDetailTask.mediaUrl) && (
+              <div className="w-full h-44 rounded-2xl overflow-hidden border border-purple-500/30 bg-slate-950 relative shadow-md">
+                <img
+                  src={selectedDetailTask.thumbnailUrl || selectedDetailTask.mediaUrl}
+                  alt={selectedDetailTask.title}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
 
             {/* Quick Reward & Timer Stats Cards */}
             <div className="grid grid-cols-2 gap-2.5">

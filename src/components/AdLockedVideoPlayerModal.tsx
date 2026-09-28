@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X,
@@ -49,6 +49,7 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
   // Sending to channel status
   const [isSendingToChannel, setIsSendingToChannel] = useState(false);
   const [statusNotification, setStatusNotification] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const hasNotifiedUnlockRef = useRef(false);
 
   // Initialize data on open
   useEffect(() => {
@@ -165,7 +166,7 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
               type: 'success',
               text: '🎉 বিজ্ঞাপন দেখা সম্পন্ন হয়েছে! এবার নিচের নীল বাটনে ক্লিক করে ইনবক্সে ফুল ভিডিও নিন।',
             });
-            onUnlockSuccess?.(video.id);
+            // Do not fire duplicate unlock notification here; it will fire once when video is sent/unlocked
           } else {
             setStatusNotification({
               type: 'success',
@@ -217,7 +218,10 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
           text: data.message || '✅ ফুল ভিডিও চ্যানেলে আপলোড হয়েছে!',
         });
 
-        if (onUnlockSuccess) onUnlockSuccess(video.id);
+        if (onUnlockSuccess && !hasNotifiedUnlockRef.current) {
+          hasNotifiedUnlockRef.current = true;
+          onUnlockSuccess(video.id);
+        }
 
         // INSTANT REDIRECT: Immediately open the Telegram Channel so user has ZERO wait!
         if (data.postUrl) {

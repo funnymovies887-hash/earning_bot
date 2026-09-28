@@ -404,9 +404,15 @@ async function executeTelegramDeleteMessage(chatId: string, messageId: number, c
       }
     }
 
-    // If message is already deleted or not found, consider it deleted
-    if (data.description && (data.description.includes("message to delete not found") || data.description.includes("message can't be deleted"))) {
-      return { success: true, error: data.description };
+    // If message is already deleted or not found, consider it successfully cleared
+    if (data.description && data.description.includes("message to delete not found")) {
+      return { success: true };
+    }
+
+    // If bot lacks delete permissions in the channel or message cannot be deleted
+    if (data.description && data.description.includes("message can't be deleted")) {
+      console.warn(`[AutoDelete] Telegram error: 'message can't be deleted'. Ensure bot is Admin with 'Delete Messages' permission in ${target}`);
+      return { success: false, error: "বটকে চ্যানেলে 'Delete Messages' পারমিশন দিন।" };
     }
 
     return { success: false, error: data.description || "Telegram delete failed" };
@@ -468,8 +474,8 @@ async function cleanupExpiredTelegramVideos() {
   }
 }
 
-// Check every 15 seconds for expired video deletion
-setInterval(cleanupExpiredTelegramVideos, 15 * 1000);
+// Check every 10 seconds for expired video deletion
+setInterval(cleanupExpiredTelegramVideos, 10 * 1000);
 setTimeout(cleanupExpiredTelegramVideos, 2000);
 
 
@@ -1003,8 +1009,10 @@ async function startServer() {
       category: assignedCategory,
       subCategory: subCategory.trim() || (assignedCategory === 'visit' ? 'Adsterra Direct Link' : assignedCategory),
       destinationUrl: destinationUrl.trim() || "https://google.com",
-      mediaType: mediaType || "none",
-      mediaUrl: mediaUrl.trim() || undefined,
+      mediaType: mediaType || (mediaUrl ? "image" : "none"),
+      mediaUrl: (mediaUrl || req.body.thumbnailUrl || req.body.thumbnail || "").trim() || undefined,
+      thumbnailUrl: (req.body.thumbnailUrl || mediaUrl || req.body.thumbnail || "").trim() || undefined,
+      thumbnail: (req.body.thumbnail || mediaUrl || req.body.thumbnailUrl || "").trim() || undefined,
       rewardBdt: bdtAmount,
       rewardUsd: usdAmount,
       timerSeconds: seconds,
@@ -1056,7 +1064,9 @@ async function startServer() {
       subCategory: subCategory !== undefined ? subCategory.trim() : current.subCategory,
       destinationUrl: destinationUrl !== undefined ? destinationUrl.trim() : current.destinationUrl,
       mediaType: mediaType || current.mediaType,
-      mediaUrl: mediaUrl !== undefined ? mediaUrl.trim() : current.mediaUrl,
+      mediaUrl: mediaUrl !== undefined ? mediaUrl.trim() : (req.body.thumbnailUrl || req.body.thumbnail || current.mediaUrl),
+      thumbnailUrl: (req.body.thumbnailUrl || mediaUrl || req.body.thumbnail || (current as any).thumbnailUrl || current.mediaUrl)?.trim(),
+      thumbnail: (req.body.thumbnail || mediaUrl || req.body.thumbnailUrl || (current as any).thumbnail || current.mediaUrl)?.trim(),
       rewardBdt: bdtAmount,
       rewardUsd: usdAmount,
       timerSeconds: timerSeconds !== undefined ? Math.max(0, parseInt(timerSeconds)) : current.timerSeconds,
@@ -2320,7 +2330,7 @@ async function startServer() {
       return res.status(400).json({ error: "⚠️ টেলিগ্রাম বট টোকেন কনফিগার করা নেই। এডমিন প্যানেলে বট টোকেন সেভ করুন।" });
     }
 
-    const targetChat = formatTelegramChatTarget(targetChannel || "@demovideos24");
+    const rawTarget = (targetChannel || "@demovideos24").trim();
 
     // Build 3 inline buttons as explicitly specified by the user:
     // Button 1: “👀 Watch Demo”
@@ -2345,6 +2355,89 @@ async function startServer() {
       caption += `${escapeTgHtml(cleanDesc)}\n\n`;
     }
     caption += `━━━━━━━━━━━━━━━━━━━━\n👇 <b>ভিডিওটি দেখতে নিচের বাটনগুলো ব্যবহার করুন:</b>`;
+
+    const isBotBroadcast =
+      rawTarget.toLowerCase().includes("choloincomekoribot") ||
+      rawTarget.toLowerCase() === "broadcast" ||
+      rawTarget.toLowerCase() === "all_users" ||
+      rawTarget.toLowerCase() === "bot_chat" ||
+      rawTarget.toLowerCase() === "bot_users";
+
+    // If broadcasting directly to Bot Chat (all users who started @CholoIncomeKoriBot)
+    if (isBotBroadcast) {
+      const userIds = Object.keys(usersMap).filter((id) => /^\d+$/.test(id));
+      console.log(`[BotBroadcast] Broadcasting post to ${userIds.length} registered bot users...`);
+
+      let sentCount = 0;
+      let lastMsgId: number | null = null;
+
+      for (const uid of userIds) {
+        try {
+          let sendRes;
+          if (thumbnail && thumbnail.trim()) {
+            sendRes = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                chat_id: uid,
+                photo: thumbnail.trim(),
+                caption,
+                parse_mode: "HTML",
+                reply_markup: inlineKeyboard,
+              }),
+            });
+          } else {
+            sendRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                chat_id: uid,
+                text: caption,
+                parse_mode: "HTML",
+                reply_markup: inlineKeyboard,
+              }),
+            });
+          }
+          const sendData: any = await sendRes.json();
+          if (sendData.ok && sendData.result?.message_id) {
+            sentCount++;
+            lastMsgId = sendData.result.message_id;
+          }
+        } catch (uErr) {
+          console.warn(`[BotBroadcast] Error sending to user ${uid}:`, uErr);
+        }
+      }
+
+      const botUserPost = {
+        id: "pub_" + Date.now(),
+        targetChannel: "@CholoIncomeKoriBot (ইউজার চ্যাটবক্স)",
+        title: cleanTitle,
+        description: cleanDesc,
+        thumbnail: thumbnail || "",
+        demoUrl: validDemoUrl,
+        fullVideoUrl: validFullUrl,
+        tutorialUrl: validTutUrl,
+        messageId: lastMsgId || 0,
+        postUrl: `https://t.me/CholoIncomeKoriBot`,
+        publishedAt: new Date().toISOString(),
+        status: "published",
+        broadcastRecipients: sentCount,
+      };
+
+      serverChannelPosts.unshift(botUserPost);
+      saveJsonFile("channel_posts.json", serverChannelPosts);
+
+      return res.json({
+        success: true,
+        message: `🎉 পোস্টটি সফলভাবে @CholoIncomeKoriBot-এর ${sentCount} জন ব্যবহারকারীর চ্যাটবক্সে পাঠানো হয়েছে! ব্যবহারকারীরা বটের চ্যাটে "Open App" বাটনের ঠিক উপরে পোস্টটি দেখতে পারবেন।`,
+        postUrl: `https://t.me/CholoIncomeKoriBot`,
+        messageId: lastMsgId,
+        post: botUserPost,
+        allPosts: serverChannelPosts,
+      });
+    }
+
+    const targetChat = formatTelegramChatTarget(rawTarget);
 
     let publishedMsgId: number | null = null;
     let tgErrorMsg = "";

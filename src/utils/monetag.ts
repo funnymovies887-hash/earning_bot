@@ -35,8 +35,9 @@ export function isAdSuppressed(): boolean {
 /**
  * Initialize In-App Interstitial Ads for general users.
  * Settings match user specification:
- * - 2 ads per 0.1 hours (6 minutes)
- * - 30s interval, 5s initial timeout
+ * - NO auto ads upon entering mini app (timeout set to 600s = 10 minutes)
+ * - Safe interval between ads: 600s (10 minutes)
+ * - frequency: 2, capping: 1 hour
  * - session saved between transitions
  */
 export function initMonetagInAppAds() {
@@ -54,13 +55,13 @@ export function initMonetagInAppAds() {
         type: 'inApp',
         inAppSettings: {
           frequency: 2,
-          capping: 0.1,
-          interval: 30,
-          timeout: 5,
+          capping: 1, // 1 hour capping
+          interval: 600, // 10 minutes between ads
+          timeout: 600, // 10 minutes delay on first entrance (no 5-10s popup!)
           everyPage: false,
         },
       });
-      console.log('[Monetag] In-App Interstitial initialized successfully');
+      console.log('[Monetag] In-App Interstitial initialized (10-min interval, no entry popup)');
     } catch (e) {
       console.warn('[Monetag] Failed to initialize inApp ads:', e);
     }

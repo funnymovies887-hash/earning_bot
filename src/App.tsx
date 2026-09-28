@@ -259,10 +259,10 @@ export default function App() {
       })
       .catch(() => {});
 
-    // Initialize Monetag In-App Interstitial for regular users (strictly suppressed if admin)
+    // Initialize Monetag In-App Interstitial for regular users only after 10 minutes (no ad on entry)
     const adTimer = setTimeout(() => {
       initMonetagInAppAds();
-    }, 2500);
+    }, 10 * 60 * 1000); // 10 minutes delay
 
     return () => clearTimeout(adTimer);
   }, []);
@@ -1000,12 +1000,20 @@ export default function App() {
           onClose={() => setActiveAdLockedVideo(null)}
           user={user}
           onUnlockSuccess={(videoId) => {
-            addInboxNotification({
-              id: 'ad-video-unlocked-' + Date.now(),
-              type: 'video',
-              title: '🎉 সম্পূর্ণ ভিডিও ৯০ মিনিটের জন্য আনলক হয়েছে!',
-              body: 'অভিনন্দন! ১৫টি বিজ্ঞাপন দেখা সম্পন্ন হওয়ায় সম্পূর্ণ ভিডিও দেখার এক্সেস দেওয়া হয়েছে।',
-              details: 'পরবর্তী ৯০ মিনিট পর্যন্ত এই ভিডিওটি যেকোনো সময় কোনো বাধা ছাড়াই দেখতে পারবেন। ৯০ মিনিট পর ভিডিওটি স্বয়ংক্রিয়ভাবে পুনরায় লক হবে।',
+            setInboxNotifications((prev) => {
+              if (prev.some((n) => n.id === `ad-video-unlocked-${videoId}`)) {
+                return prev;
+              }
+              const newNotif = {
+                id: `ad-video-unlocked-${videoId}`,
+                type: 'video' as const,
+                title: '🎉 সম্পূর্ণ ভিডিও ৯০ মিনিটের জন্য আনলক হয়েছে!',
+                body: 'অভিনন্দন! বিজ্ঞাপন দেখা সম্পন্ন হওয়ায় সম্পূর্ণ ভিডিও দেখার এক্সেস দেওয়া হয়েছে।',
+                details: 'পরবর্তী ৯০ মিনিট পর্যন্ত এই ভিডিওটি যেকোনো সময় কোনো বাধা ছাড়াই দেখতে পারবেন। ৯০ মিনিট পর ভিডিওটি স্বয়ংক্রিয়ভাবে পুনরায় লক হবে।',
+                time: 'এইমাত্র',
+                read: false,
+              };
+              return [newNotif, ...prev];
             });
           }}
         />

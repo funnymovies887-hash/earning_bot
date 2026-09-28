@@ -82,6 +82,8 @@ export interface IncomeTask {
   destinationUrl: string;
   mediaType: 'image' | 'video' | 'file' | 'link' | 'none';
   mediaUrl?: string;
+  thumbnailUrl?: string;
+  thumbnail?: string;
   rewardBdt: number;
   rewardUsd: number;
   timerSeconds: number;

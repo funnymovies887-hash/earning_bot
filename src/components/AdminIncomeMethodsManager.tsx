@@ -178,6 +178,8 @@ export const AdminIncomeMethodsManager: React.FC<AdminIncomeMethodsManagerProps>
           timerSeconds: newTimerSeconds,
           mediaType: newMediaType,
           mediaUrl: newMediaUrl,
+          thumbnailUrl: newMediaUrl,
+          thumbnail: newMediaUrl,
           instructions: newInstructions,
           isHot: newIsHot,
           isActive: newIsActive,

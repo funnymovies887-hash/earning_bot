@@ -285,8 +285,8 @@ export const AdminChannelPublisherTab: React.FC = () => {
               {/* Quick channel chips */}
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {[
+                  { handle: '@CholoIncomeKoriBot', label: '🤖 বটের চ্যাটবক্স (@CholoIncomeKoriBot - Open App বাটনের উপরে)' },
                   { handle: '@demovideos24', label: 'ডেমো চ্যানেল (@demovideos24)' },
-                  { handle: '@premiumvideounlocked', label: 'ফুল ভিডিও (@premiumvideounlocked)' },
                   { handle: '@CholoIncomeKori', label: 'অফিসিয়াল (@CholoIncomeKori)' },
                   { handle: '@IncomeBD_Online', label: 'ব্যাকআপ (@IncomeBD_Online)' },
                 ].map((ch) => (
