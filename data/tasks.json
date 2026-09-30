@@ -21,7 +21,7 @@
     "title": "🔥 Premium Web Store – আপনার পছন্দের Digital Products এক জায়গায়! 💎",
     "category": "visit",
     "subCategory": "Adsterra Direct Link",
-    "destinationUrl": "https://premium-web-store.onrender.com",
+    "destinationUrl": "https://premium-web-store.arifaislam9157.workers.dev/",
     "mediaType": "link",
     "rewardBdt": 1,
     "rewardUsd": 0.008333,
@@ -31,7 +31,9 @@
     "isActive": true,
     "createdAt": "2026-09-26",
     "totalCompletions": 0,
-    "mediaUrl": "https://i.postimg.cc/Kvh5Qmyk/IMG-20260926-223357-438.jpg"
+    "mediaUrl": "https://i.postimg.cc/Kvh5Qmyk/IMG-20260926-223357-438.jpg",
+    "thumbnailUrl": "https://i.postimg.cc/Kvh5Qmyk/IMG-20260926-223357-438.jpg",
+    "thumbnail": "https://i.postimg.cc/Kvh5Qmyk/IMG-20260926-223357-438.jpg"
   },
   {
     "id": "task-1790401487215-ip36",
@@ -150,7 +152,7 @@
     "isHot": true,
     "isActive": true,
     "createdAt": "2026-09-01",
-    "totalCompletions": 0
+    "totalCompletions": 1
   },
   {
     "id": "task-tg-2",
@@ -167,7 +169,7 @@
     "isHot": false,
     "isActive": true,
     "createdAt": "2026-09-02",
-    "totalCompletions": 0
+    "totalCompletions": 2
   },
   {
     "id": "task-mission-1",
@@ -183,7 +185,7 @@
     "isHot": true,
     "isActive": true,
     "createdAt": "2026-09-01",
-    "totalCompletions": 0
+    "totalCompletions": 1
   },
   {
     "id": "task-mission-2",
