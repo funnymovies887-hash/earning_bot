@@ -41,6 +41,7 @@ import { AdminDataBackupTab } from './admin/AdminDataBackupTab';
 import { AdminIncomeMethodsManager } from './AdminIncomeMethodsManager';
 import { AdminFloatingToast, AdminToastData } from './admin/AdminFloatingToast';
 import { AdminSaveButton } from './admin/AdminSaveButton';
+import { AdminUserDetailsModal } from './admin/AdminUserDetailsModal';
 import { Activity } from 'lucide-react';
 import { performAutoSync } from '../utils/adminAutoSync';
 import { setAdminActiveState } from '../utils/monetag';
@@ -59,6 +60,7 @@ export const AdminDashboard: React.FC = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [videos, setVideos] = useState<VideoItem[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAutoSyncing, setIsAutoSyncing] = useState<boolean>(false);
@@ -133,6 +135,11 @@ export const AdminDashboard: React.FC = () => {
   const [newAdLimit, setNewAdLimit] = useState<number>(40);
   const [newActiveRefs, setNewActiveRefs] = useState<number>(0);
 
+  // User details view modal state
+  const [viewingUserDetails, setViewingUserDetails] = useState<UserProfile | null>(null);
+  const [allTasksList, setAllTasksList] = useState<any[]>([]);
+  const [copiedUid, setCopiedUid] = useState<string | null>(null);
+
   // Add video form state
   const [showAddVideo, setShowAddVideo] = useState(false);
   const [newVideoTitle, setNewVideoTitle] = useState('');
@@ -194,12 +201,14 @@ export const AdminDashboard: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [statsRes, withRes, vidRes, tgRes, incRes] = await Promise.all([
+      const [statsRes, withRes, vidRes, tgRes, incRes, tasksRes, ordersRes] = await Promise.all([
         fetch('/api/admin/stats').then(r => r.json()),
         fetch('/api/withdrawals').then(r => r.json()),
         fetch('/api/videos').then(r => r.json()),
         fetch('/api/admin/telegram-config').then(r => r.json()).catch(() => null),
         fetch('/api/income-methods').then(r => r.json()).catch(() => null),
+        fetch('/api/tasks').then(r => r.json()).catch(() => null),
+        fetch('/api/admin/orders').then(r => r.json()).catch(() => []),
       ]);
 
       if (statsRes.success) {
@@ -208,6 +217,10 @@ export const AdminDashboard: React.FC = () => {
       }
       setWithdrawals(Array.isArray(withRes) ? withRes : []);
       setVideos(Array.isArray(vidRes) ? vidRes : []);
+      setOrders(Array.isArray(ordersRes) ? ordersRes : []);
+      if (tasksRes && Array.isArray(tasksRes.tasks)) {
+        setAllTasksList(tasksRes.tasks);
+      }
 
       if (tgRes && tgRes.success && tgRes.config) {
         setTgBotToken(tgRes.config.botToken || '');
@@ -1093,7 +1106,14 @@ export const AdminDashboard: React.FC = () => {
                     <DollarSign className="w-4 h-4" />
                   </div>
                 </div>
-                <div className="mt-4 text-2xl font-black text-emerald-400">${stats?.totalPaidUsd || '10.30'}</div>
+                <div className="mt-4">
+                  <div className="text-2xl font-black text-amber-300">
+                    ৳ {Math.round(Number(stats?.totalPaidUsd || 10.30) * 120).toLocaleString()} <span className="text-xs font-semibold text-amber-400">BDT</span>
+                  </div>
+                  <div className="text-xs font-mono text-emerald-400 mt-0.5">
+                    ${stats?.totalPaidUsd || '10.30'} USD
+                  </div>
+                </div>
                 <div className="text-xs text-slate-400 mt-1">via bKash, Nagad & Rocket</div>
               </div>
 
@@ -1317,47 +1337,72 @@ export const AdminDashboard: React.FC = () => {
                     {users.map((u) => (
                       <tr key={u.id} className="hover:bg-slate-800/40 transition-colors">
                         <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
+                          <div
+                            onClick={() => setViewingUserDetails(u)}
+                            className="flex items-center gap-3 cursor-pointer group"
+                            title="ইউজারের বিস্তারিত কাজের বিবরণ দেখতে ক্লিক করুন"
+                          >
                             <img
                               src={u.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
                               alt=""
-                              className="w-9 h-9 rounded-full object-cover border border-slate-700"
+                              className="w-10 h-10 rounded-full object-cover border border-slate-700 group-hover:border-amber-400 group-hover:scale-105 transition-all"
                             />
                             <div>
-                              <div className="font-semibold text-white">{u.displayName}</div>
-                              <div className="text-xs text-slate-400">@{u.username}</div>
+                              <div className="font-semibold text-white group-hover:text-amber-300 transition-colors flex items-center gap-1.5">
+                                <span>{u.displayName}</span>
+                                <Eye className="w-3.5 h-3.5 text-slate-500 group-hover:text-amber-400" />
+                              </div>
+                              <div className="text-xs text-slate-400">@{u.username} • ID: {u.id}</div>
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 font-bold text-amber-400">
-                          ${u.balanceUsd?.toFixed(2)} USD
+                        <td className="px-6 py-4">
+                          <div className="font-extrabold text-amber-300 text-sm">
+                            ৳{(Number(u.balanceUsd || 0) * 120).toFixed(2)} BDT
+                          </div>
+                          <div className="text-[11px] font-mono text-emerald-400">
+                            ${Number(u.balanceUsd || 0).toFixed(4)} USD
+                          </div>
                         </td>
                         <td className="px-6 py-4 text-slate-300">
-                          {u.joinedCount || 0} users
+                          <div><span className="font-bold text-white">{u.joinedCount || 0}</span> জন রেফার</div>
+                          <div className="text-[10px] text-amber-400">সক্রিয়: {u.activeReferralsWithActivity || 0} জন</div>
                         </td>
                         <td className="px-6 py-4 text-slate-300">
-                          {u.adsWatchedToday || 0} / {u.dailyAdLimit || 300}
+                          <span className="font-bold text-white">{u.adsWatchedToday || 0}</span> / {u.dailyAdLimit || 40}
+                          <div className="text-[10px] text-slate-500">টাস্ক: {u.completedTaskIds?.length || 0}টি সম্পন্ন</div>
                         </td>
                         <td className="px-6 py-4 font-mono text-xs text-slate-400">
                           {u.referralCode}
                         </td>
                         <td className="px-6 py-4 text-right space-x-2">
                           <button
+                            type="button"
+                            onClick={() => setViewingUserDetails(u)}
+                            className="inline-flex items-center gap-1.5 bg-purple-950/70 hover:bg-purple-900 text-purple-300 hover:text-white font-semibold text-xs px-3 py-1.5 rounded-lg border border-purple-500/40 transition-colors cursor-pointer shadow-sm"
+                            title="ইউজারের কাজের সম্পূর্ণ বিবরণ ও রিপোর্ট দেখুন"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-purple-400" />
+                            <span>কাজের বিবরণ</span>
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => {
                               setEditingUser(u);
                               setNewBalance(u.balanceUsd);
                               setNewAdLimit(u.dailyAdLimit || 40);
                               setNewActiveRefs(u.activeReferralsWithActivity || 0);
                             }}
-                            className="inline-flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold text-xs px-3 py-1.5 rounded-lg border border-slate-700 transition-colors"
+                            className="inline-flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold text-xs px-3 py-1.5 rounded-lg border border-slate-700 transition-colors cursor-pointer"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                             <span>Edit User</span>
                           </button>
                           {u.id !== 'usr_78912' && (
                             <button
+                              type="button"
                               onClick={() => handleDeleteUser(u.id, u.displayName)}
-                              className="inline-flex items-center gap-1 bg-red-950/60 hover:bg-red-800 text-rose-400 hover:text-white border border-rose-800/40 font-semibold text-xs px-2.5 py-1.5 rounded-lg transition-colors"
+                              className="inline-flex items-center gap-1 bg-red-950/60 hover:bg-red-800 text-rose-400 hover:text-white border border-rose-800/40 font-semibold text-xs px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
                               title="Delete User"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -1958,6 +2003,24 @@ export const AdminDashboard: React.FC = () => {
               </div>
             </div>
           </div>
+        )}
+
+        {/* MODAL: Full User Details & Work History Report */}
+        {viewingUserDetails && (
+          <AdminUserDetailsModal
+            user={viewingUserDetails}
+            allTasks={allTasksList}
+            allWithdrawals={withdrawals}
+            allOrders={orders}
+            onClose={() => setViewingUserDetails(null)}
+            onEditUser={(u) => {
+              setViewingUserDetails(null);
+              setEditingUser(u);
+              setNewBalance(u.balanceUsd);
+              setNewAdLimit(u.dailyAdLimit || 40);
+              setNewActiveRefs(u.activeReferralsWithActivity || 0);
+            }}
+          />
         )}
 
         {/* MODAL: Add New Video */}
