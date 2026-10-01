@@ -62,12 +62,14 @@
     "mediaUrl": "https://i.postimg.cc/gkhvGpFS/image-search-1790270827363.png",
     "rewardBdt": 0.2,
     "rewardUsd": 0.001667,
-    "timerSeconds": 30,
+    "timerSeconds": 60,
     "instructions": "ভিডিও বিজ্ঞাপনটি ৩০ সেকেন্ড দেখুন এবং পুরো টাকা অ্যাকাউন্টে যোগ করে নিন।",
     "isHot": true,
     "isActive": true,
     "createdAt": "2026-09-01",
-    "totalCompletions": 0
+    "totalCompletions": 0,
+    "thumbnailUrl": "https://i.postimg.cc/gkhvGpFS/image-search-1790270827363.png",
+    "thumbnail": "https://i.postimg.cc/gkhvGpFS/image-search-1790270827363.png"
   },
   {
     "id": "task-ad-2",
