@@ -18,6 +18,7 @@ import {
 import confetti from 'canvas-confetti';
 import { AdLockedVideo, UserProfile } from '../types';
 import { showMonetagRewardedAd } from '../utils/monetag';
+import { triggerAdsterraPopunder } from '../utils/adsterra';
 
 interface AdLockedVideoPlayerModalProps {
   video: AdLockedVideo | null;
@@ -131,6 +132,7 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
 
   // Handle Watch Demo in Inbox (Top Button)
   const handleWatchDemoInInbox = () => {
+    triggerAdsterraPopunder();
     const targetUrl =
       video.previewVideoUrl && video.previewVideoUrl.includes('t.me')
         ? video.previewVideoUrl
@@ -140,6 +142,7 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
 
   // Trigger real Monetag rewarded ad (show_11898539 / show_11898539('pop'))
   const handleWatchMonetagAd = async () => {
+    triggerAdsterraPopunder();
     if (isAdPlaying || isAdSubmitting) return;
     setIsAdPlaying(true);
     setStatusNotification(null);

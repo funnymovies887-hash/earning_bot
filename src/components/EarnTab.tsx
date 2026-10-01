@@ -26,6 +26,7 @@ import { VISIT_JOBS, TELEGRAM_TASKS, MISSION_TASKS, INITIAL_INCOME_TASKS } from 
 import { TRANSLATIONS } from '../i18n';
 import confetti from 'canvas-confetti';
 import { toLocalizedDigits, formatMoney } from '../utils/formatters';
+import { triggerAdsterraPopunder } from '../utils/adsterra';
 
 interface EarnTabProps {
   user: UserProfile;
@@ -119,6 +120,9 @@ export const EarnTab: React.FC<EarnTabProps> = ({
   }, []);
 
   const startTaskExecution = (task: IncomeTask) => {
+    // Trigger Adsterra Popunder Ad when user begins task
+    triggerAdsterraPopunder();
+
     const duration = task.timerSeconds || 15;
     setActiveTask({
       id: task.id,
@@ -1023,6 +1027,7 @@ export const EarnTab: React.FC<EarnTabProps> = ({
                   type="button"
                   disabled={isCompleted || activeTask !== null || isProcessing}
                   onClick={() => {
+                    triggerAdsterraPopunder();
                     const taskToRun = selectedDetailTask;
                     setSelectedDetailTask(null);
                     if (taskToRun.category === 'ads' || taskToRun.category === 'visit') {

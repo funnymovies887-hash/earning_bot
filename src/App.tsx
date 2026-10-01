@@ -49,6 +49,7 @@ import { Headphones, Bell, X, Check, ArrowRight, Gift, ShieldAlert, Sparkles, Ch
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { initMonetagInAppAds } from './utils/monetag';
+import { initAdsterraPopunder, triggerAdsterraPopunder } from './utils/adsterra';
 
 function getInitialTelegramUser() {
   try {
@@ -258,6 +259,9 @@ export default function App() {
         }
       })
       .catch(() => {});
+
+    // Initialize Adsterra Popunder for general users (strictly suppressed if admin)
+    initAdsterraPopunder();
 
     // Initialize Monetag In-App Interstitial for regular users only after 10 minutes (no ad on entry)
     const adTimer = setTimeout(() => {
@@ -838,6 +842,7 @@ export default function App() {
               user={user}
               language={user?.language || 'bn'}
               onWatchAd={() => {
+                triggerAdsterraPopunder();
                 const maxDailyLimit = incomeConfig?.ads?.dailyLimit || user.dailyAdLimit || 40;
                 if ((user.adsWatchedToday || 0) >= maxDailyLimit) {
                   addNotification({
