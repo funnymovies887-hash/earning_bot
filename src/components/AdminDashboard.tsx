@@ -42,6 +42,7 @@ import { AdminIncomeMethodsManager } from './AdminIncomeMethodsManager';
 import { AdminFloatingToast, AdminToastData } from './admin/AdminFloatingToast';
 import { AdminSaveButton } from './admin/AdminSaveButton';
 import { AdminUserDetailsModal } from './admin/AdminUserDetailsModal';
+import { AdminMasterSyncBar } from './admin/AdminMasterSyncBar';
 import { Activity } from 'lucide-react';
 import { performAutoSync } from '../utils/adminAutoSync';
 import { setAdminActiveState } from '../utils/monetag';
@@ -373,38 +374,24 @@ export const AdminDashboard: React.FC = () => {
     setIsAutoSyncing(true);
     try {
       // 1. Refresh browser vault and user caches from authoritative server state
-      const res = await performAutoSync(true);
+      await performAutoSync(true);
 
-      // 2. Direct GitHub Auto-Commit push
-      let ghResult: any = null;
-      try {
-        const ghRes = await fetch('/api/admin/github-sync/push', { method: 'POST' });
-        ghResult = await ghRes.json();
-      } catch (ghErr: any) {
-        console.warn('GitHub push error during auto-sync:', ghErr);
-      }
+      // 2. Direct Universal Master Save & GitHub Auto-Commit push
+      const masterRes = await fetch('/api/admin/master-save', { method: 'POST' });
+      const masterData = await masterRes.json();
 
-      if (ghResult && ghResult.success) {
+      if (masterData.success) {
         setToast({
           type: 'success',
           title: 'সার্ভার ও GitHub অটো-কমিট সম্পন্ন! 🚀',
-          message: `এডমিন প্যানেলের সমস্ত আপডেট সফলভাবে সেভ হয়েছে এবং GitHub-এ সরাসরি অটো-কমিট সম্পন্ন হয়েছে! (${ghResult.successCount}টি ফাইল)`,
+          message: masterData.message || 'এডমিন প্যানেলের সমস্ত আপডেট সফলভাবে সেভ হয়েছে এবং GitHub-এ সরাসরি অটো-কমিট সম্পন্ন হয়েছে!',
         });
-        setAutoSyncBanner(`🎉 ১-ক্লিকে সমস্ত ডাটা সার্ভার ও GitHub-এ সফলভাবে সেভ ও অটো-কমিট হয়েছে! (${ghResult.successCount}টি ফাইল)`);
-      } else if (res.success) {
-        setToast({
-          type: 'success',
-          title: 'সার্ভারে সফলভাবে সেভ ও সুরক্ষিত হয়েছে! ✅',
-          message: ghResult?.error
-            ? `সার্ভারে প্যাকেজ ও ডাটা সুরক্ষিত। (${ghResult.error})`
-            : 'প্যাকেজ, ব্যবহারকারী ও সেটিংস শতভাগ সুরক্ষিত ও সিঙ্ক হয়েছে।',
-        });
-        setAutoSyncBanner(ghResult?.error ? `সার্ভারে সেভ হয়েছে। (${ghResult.error})` : res.message);
+        setAutoSyncBanner(masterData.message || '🎉 সমস্ত ডাটা সার্ভার ও GitHub-এ সফলভাবে সেভ ও অটো-কমিট হয়েছে!');
       } else {
         setToast({
-          type: 'error',
-          title: 'সিঙ্ক সতর্কবার্তা',
-          message: res.message,
+          type: 'warning',
+          title: 'সার্ভারে সেভ হয়েছে',
+          message: masterData.message || 'সার্ভারে সেভ হয়েছে, তবে GitHub টোকেন কনফিগার করা প্রয়োজন।',
         });
       }
       fetchData();
@@ -1052,6 +1039,15 @@ export const AdminDashboard: React.FC = () => {
               <span>Refresh</span>
             </button>
           </div>
+        </div>
+
+        {/* Universal Master Sync, Live Status & Save Bar */}
+        <div className="mt-4">
+          <AdminMasterSyncBar
+            onRefreshData={fetchData}
+            showToast={(t) => setToast(t)}
+            isSavingGlobal={isAutoSyncing}
+          />
         </div>
 
         {/* Auto Sync Reassurance Banner */}

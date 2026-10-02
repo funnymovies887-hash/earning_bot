@@ -382,6 +382,19 @@ export default function App() {
         }
       })
       .catch(() => {});
+
+    // Prefetch live digital store packages on mount so any browser immediately has fresh data
+    fetch('/api/packages')
+      .then((res) => res.json())
+      .then((pkgs) => {
+        if (Array.isArray(pkgs)) {
+          const clean = pkgs.filter((p: any) => p && !['pkg-1', 'pkg-2', 'pkg-3'].includes(p.id));
+          try {
+            localStorage.setItem('earn_digital_packages', JSON.stringify(clean));
+          } catch {}
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // Sync user state changes to local storage & backend

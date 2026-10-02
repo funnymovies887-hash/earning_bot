@@ -209,7 +209,9 @@ function getRequestUser(req: express.Request): any {
 }
 
 // Persistent Videos / Earning Video Tasks (guaranteed to survive Render sleep & restarts)
+let deletedVideoIds: string[] = loadJsonFile("deleted_video_ids.json", []);
 let serverVideos = loadJsonFile("videos.json", [...INITIAL_VIDEOS]);
+serverVideos = serverVideos.filter((v) => v && v.id && !deletedVideoIds.includes(v.id));
 if (!fs.existsSync(path.join(DATA_DIR, "videos.json"))) {
   saveJsonFile("videos.json", serverVideos);
 }
@@ -490,7 +492,9 @@ if (!fs.existsSync(path.join(DATA_DIR, "payment_config.json"))) {
 }
 
 // 5 Income Methods Tasks (Adsterra, Monetag, Telegram, Missions, Special)
+let deletedTaskIds: string[] = loadJsonFile("deleted_task_ids.json", []);
 let serverTasks: IncomeTask[] = loadJsonFile("tasks.json", [...INITIAL_INCOME_TASKS]);
+serverTasks = serverTasks.filter((t) => t && t.id && !deletedTaskIds.includes(t.id));
 if (!fs.existsSync(path.join(DATA_DIR, "tasks.json"))) {
   saveJsonFile("tasks.json", serverTasks);
 }
@@ -532,12 +536,21 @@ interface GitHubSyncConfig {
 }
 
 let githubSyncConfig: GitHubSyncConfig = loadJsonFile("github_sync_config.json", {
-  repo: process.env.GITHUB_REPO || "",
+  repo: process.env.GITHUB_REPO || "funnymovies887-hash/earning_bot",
   branch: process.env.GITHUB_BRANCH || "main",
-  token: process.env.GITHUB_TOKEN || "",
+  token: process.env.GITHUB_TOKEN || process.env.GH_TOKEN || process.env.GITHUB_PAT || "",
   autoSyncOnChange: true,
   lastStatus: "প্রস্তুত (Ready)",
 });
+
+if (!githubSyncConfig.repo) {
+  githubSyncConfig.repo = "funnymovies887-hash/earning_bot";
+}
+const envToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || process.env.GITHUB_PAT;
+if (envToken && !githubSyncConfig.token) {
+  githubSyncConfig.token = envToken.trim();
+}
+saveJsonFile("github_sync_config.json", githubSyncConfig);
 
 async function pushFileToGitHubDirect(
   repoPath: string,
@@ -607,6 +620,261 @@ async function pushFileToGitHubDirect(
     }
   } catch (err: any) {
     return { success: false, message: "নেটওয়ার্ক সংযোগ ত্রুটি: " + err.message };
+  }
+}
+
+// Pull individual raw JSON file from GitHub repository
+async function pullFileFromGitHubDirect(repoPath: string): Promise<{ success: boolean; content?: string; error?: string }> {
+  const cleanRepo = (githubSyncConfig.repo || "funnymovies887-hash/earning_bot").replace(/^https?:\/\/github\.com\//, "").replace(/\/$/, "").trim();
+  const branch = (githubSyncConfig.branch || "main").trim();
+
+  try {
+    const rawUrl = `https://raw.githubusercontent.com/${cleanRepo}/${branch}/${repoPath}?t=${Date.now()}`;
+    const rawRes = await fetch(rawUrl);
+    if (rawRes.ok) {
+      const text = await rawRes.text();
+      return { success: true, content: text };
+    }
+
+    if (githubSyncConfig.token) {
+      const apiUrl = `https://api.github.com/repos/${cleanRepo}/contents/${repoPath}?ref=${encodeURIComponent(branch)}`;
+      const apiRes = await fetch(apiUrl, {
+        headers: {
+          "Authorization": `Bearer ${githubSyncConfig.token.trim()}`,
+          "Accept": "application/vnd.github.v3+json",
+          "User-Agent": "CholoIncomeBot-AdminSync/1.0",
+        },
+      });
+      if (apiRes.ok) {
+        const json: any = await apiRes.json();
+        if (json.content) {
+          const text = Buffer.from(json.content, "base64").toString("utf-8");
+          return { success: true, content: text };
+        }
+      }
+    }
+
+    return { success: false, error: `GitHub-এ ফাইল পাওয়া যায়নি (${rawRes.status})` };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+// Push all system data files to GitHub
+async function pushAllDataToGitHub(): Promise<{ success: boolean; message: string; results: any[]; successCount: number; totalCount: number }> {
+  if (!githubSyncConfig.token || !githubSyncConfig.repo) {
+    return {
+      success: false,
+      message: "⚠️ GitHub Token কনফিগার করা নেই। অনুগ্রহ করে Admin Panel থেকে GitHub Token প্রদান করুন।",
+      results: [],
+      successCount: 0,
+      totalCount: 0,
+    };
+  }
+
+  const files = [
+    { path: "data/packages.json", content: JSON.stringify(serverPackages, null, 2), desc: `প্যাকেজ তালিকা (${serverPackages.length}টি)` },
+    { path: "data/deleted_package_ids.json", content: JSON.stringify(deletedPackageIds, null, 2), desc: "ডিলিট করা প্যাকেজ আইডি" },
+    { path: "data/tasks.json", content: JSON.stringify(serverTasks, null, 2), desc: `টাস্ক তালিকা (${serverTasks.length}টি)` },
+    { path: "data/deleted_task_ids.json", content: JSON.stringify(deletedTaskIds, null, 2), desc: "ডিলিট করা টাস্ক আইডি" },
+    { path: "data/videos.json", content: JSON.stringify(serverVideos, null, 2), desc: `ভিডিও তালিকা (${serverVideos.length}টি)` },
+    { path: "data/deleted_video_ids.json", content: JSON.stringify(deletedVideoIds, null, 2), desc: "ডিলিট করা ভিডিও আইডি" },
+    { path: "data/ad_videos.json", content: JSON.stringify(serverAdLockedVideos, null, 2), desc: `লকড ভিডিও (${serverAdLockedVideos.length}টি)` },
+    { path: "data/income_methods_config.json", content: JSON.stringify(incomeMethodsConfig, null, 2), desc: "৫টি ইনকাম মেথড ও রেট" },
+    { path: "data/telegram_config.json", content: JSON.stringify(telegramConfig, null, 2), desc: "টেলিগ্রাম সেটিংস" },
+    { path: "data/notices.json", content: JSON.stringify(noticesConfig, null, 2), desc: "ব্রডকাস্ট ও নোটিশ" },
+    { path: "data/payment_config.json", content: JSON.stringify(serverPaymentConfig, null, 2), desc: "পেমেন্ট নম্বরসমূহ" },
+    { path: "data/users.json", content: JSON.stringify(usersMap, null, 2), desc: `ইউজার তালিকা (${Object.keys(usersMap).length} জন)` },
+    { path: "data/orders.json", content: JSON.stringify(serverOrders, null, 2), desc: `স্টোর অর্ডার (${serverOrders.length}টি)` },
+    { path: "data/withdrawals.json", content: JSON.stringify(withdrawals, null, 2), desc: `উইথড্র তালিকা (${withdrawals.length}টি)` },
+  ];
+
+  const results = [];
+  let successCount = 0;
+  const timeStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Dhaka" });
+
+  for (const f of files) {
+    const res = await pushFileToGitHubDirect(f.path, f.content, `Admin Master Sync: Update ${f.path} [${timeStr}]`);
+    results.push({ path: f.path, desc: f.desc, success: res.success, message: res.message });
+    if (res.success) successCount++;
+  }
+
+  githubSyncConfig.lastSyncedAt = new Date().toISOString();
+  githubSyncConfig.lastStatus = `✅ ${successCount}/${files.length}টি ফাইল গিটহাবে পুশ সম্পন্ন (${timeStr})`;
+  saveJsonFile("github_sync_config.json", githubSyncConfig);
+
+  return {
+    success: successCount > 0,
+    message: successCount === files.length
+      ? `🎉 চমৎকার! সমস্ত ${successCount}টি ডাটাবেজ ফাইল সরাসরি GitHub-এ অটো-কমিট ও সেভ হয়েছে!`
+      : `⚠️ ${successCount}/${files.length}টি ফাইল গিটহাবে সেভ হয়েছে।`,
+    results,
+    successCount,
+    totalCount: files.length,
+  };
+}
+
+// Pull all system data files from GitHub repository
+async function pullAllDataFromGitHub(): Promise<{ success: boolean; message: string; results: any[]; pulledCount: number }> {
+  // 1. Process deleted IDs FIRST so that incoming packages, tasks, and videos can be filtered immediately
+  const fileMappings: Array<{ path: string; name: string; apply: (parsed: any) => void }> = [
+    {
+      path: "data/deleted_package_ids.json",
+      name: "deletedPackageIds",
+      apply: (data) => {
+        if (Array.isArray(data)) {
+          deletedPackageIds = Array.from(new Set([...deletedPackageIds, ...data]));
+          saveJsonFile("deleted_package_ids.json", deletedPackageIds);
+        }
+      },
+    },
+    {
+      path: "data/deleted_task_ids.json",
+      name: "deletedTaskIds",
+      apply: (data) => {
+        if (Array.isArray(data)) {
+          deletedTaskIds = Array.from(new Set([...deletedTaskIds, ...data]));
+          saveJsonFile("deleted_task_ids.json", deletedTaskIds);
+        }
+      },
+    },
+    {
+      path: "data/deleted_video_ids.json",
+      name: "deletedVideoIds",
+      apply: (data) => {
+        if (Array.isArray(data)) {
+          deletedVideoIds = Array.from(new Set([...deletedVideoIds, ...data]));
+          saveJsonFile("deleted_video_ids.json", deletedVideoIds);
+        }
+      },
+    },
+    {
+      path: "data/packages.json",
+      name: "packages",
+      apply: (data) => {
+        if (Array.isArray(data)) {
+          serverPackages = data.filter((p) => p && p.id && !DEMO_PACKAGE_IDS.includes(p.id) && !deletedPackageIds.includes(p.id));
+          saveJsonFile("packages.json", serverPackages);
+        }
+      },
+    },
+    {
+      path: "data/tasks.json",
+      name: "tasks",
+      apply: (data) => {
+        if (Array.isArray(data)) {
+          serverTasks = data.filter((t) => t && t.id && !deletedTaskIds.includes(t.id));
+          saveJsonFile("tasks.json", serverTasks);
+        }
+      },
+    },
+    {
+      path: "data/videos.json",
+      name: "videos",
+      apply: (data) => {
+        if (Array.isArray(data)) {
+          serverVideos = data.filter((v) => v && v.id && !deletedVideoIds.includes(v.id));
+          saveJsonFile("videos.json", serverVideos);
+        }
+      },
+    },
+    {
+      path: "data/income_methods_config.json",
+      name: "incomeMethods",
+      apply: (data) => {
+        if (data && typeof data === "object") {
+          incomeMethodsConfig = { ...incomeMethodsConfig, ...data };
+          saveJsonFile("income_methods_config.json", incomeMethodsConfig);
+        }
+      },
+    },
+    {
+      path: "data/telegram_config.json",
+      name: "telegramConfig",
+      apply: (data) => {
+        if (data && typeof data === "object") {
+          telegramConfig = { ...telegramConfig, ...data };
+          saveJsonFile("telegram_config.json", telegramConfig);
+        }
+      },
+    },
+    {
+      path: "data/notices.json",
+      name: "notices",
+      apply: (data) => {
+        if (data && typeof data === "object") {
+          noticesConfig = { ...noticesConfig, ...data };
+          saveJsonFile("notices.json", noticesConfig);
+        }
+      },
+    },
+    {
+      path: "data/payment_config.json",
+      name: "paymentConfig",
+      apply: (data) => {
+        if (data && typeof data === "object") {
+          serverPaymentConfig = { ...serverPaymentConfig, ...data };
+          saveJsonFile("payment_config.json", serverPaymentConfig);
+        }
+      },
+    },
+    {
+      path: "data/ad_videos.json",
+      name: "adVideos",
+      apply: (data) => {
+        if (Array.isArray(data)) {
+          serverAdLockedVideos = data;
+          saveJsonFile("ad_videos.json", serverAdLockedVideos);
+        }
+      },
+    },
+  ];
+
+  const results = [];
+  let pulledCount = 0;
+
+  for (const fm of fileMappings) {
+    const res = await pullFileFromGitHubDirect(fm.path);
+    if (res.success && res.content) {
+      try {
+        const parsed = JSON.parse(res.content);
+        fm.apply(parsed);
+        pulledCount++;
+        results.push({ path: fm.path, success: true });
+      } catch (parseErr: any) {
+        results.push({ path: fm.path, success: false, error: parseErr.message });
+      }
+    } else {
+      results.push({ path: fm.path, success: false, error: res.error });
+    }
+  }
+
+  // Final strict filter pass: Ensure deleted items can never resurrect
+  serverPackages = serverPackages.filter((p) => p && p.id && !DEMO_PACKAGE_IDS.includes(p.id) && !deletedPackageIds.includes(p.id));
+  saveJsonFile("packages.json", serverPackages);
+  serverTasks = serverTasks.filter((t) => t && t.id && !deletedTaskIds.includes(t.id));
+  saveJsonFile("tasks.json", serverTasks);
+  serverVideos = serverVideos.filter((v) => v && v.id && !deletedVideoIds.includes(v.id));
+  saveJsonFile("videos.json", serverVideos);
+
+  return {
+    success: pulledCount > 0,
+    message: `✅ GitHub থেকে সফলভাবে ${pulledCount}টি ডাটাবেজ মডিউল সিঙ্ক করা হয়েছে!`,
+    results,
+    pulledCount,
+  };
+}
+
+// Startup Hydration: Ensure freshest data from GitHub upon container start/reboot
+async function hydrateServerFromGitHub() {
+  try {
+    console.log("[GitHub Auto-Hydrate] Checking for latest GitHub updates on startup...");
+    const res = await pullAllDataFromGitHub();
+    if (res.success) {
+      console.log(`[GitHub Auto-Hydrate] Successfully hydrated ${res.pulledCount} modules from GitHub!`);
+    }
+  } catch (err: any) {
+    console.warn("[GitHub Auto-Hydrate Warning]:", err.message);
   }
 }
 
@@ -922,6 +1190,14 @@ async function startServer() {
         referral: { ...incomeMethodsConfig.referral, ...(updated.referral || {}) },
       };
       saveJsonFile("income_methods_config.json", incomeMethodsConfig);
+
+      if (githubSyncConfig.token && githubSyncConfig.repo && githubSyncConfig.autoSyncOnChange) {
+        pushFileToGitHubDirect(
+          "data/income_methods_config.json",
+          JSON.stringify(incomeMethodsConfig, null, 2),
+          "Admin: Update 5 Income Methods Configuration"
+        ).catch(() => {});
+      }
     }
     res.json({
       success: true,
@@ -937,7 +1213,7 @@ async function startServer() {
   // Public: Get all active tasks, optionally filtered by category (ads, visit, telegram, mission, special)
   app.get("/api/tasks", (req, res) => {
     const category = req.query.category as string;
-    let list = serverTasks.filter((t) => t.isActive !== false);
+    let list = serverTasks.filter((t) => t.isActive !== false && !deletedTaskIds.includes(t.id));
     if (category) {
       list = list.filter((t) => t.category === category);
     }
@@ -947,20 +1223,20 @@ async function startServer() {
   // Admin: Get all tasks (both active and inactive) with stats
   app.get("/api/admin/tasks", (req, res) => {
     const category = req.query.category as string;
-    let list = [...serverTasks];
+    let list = serverTasks.filter((t) => !deletedTaskIds.includes(t.id));
     if (category) {
       list = list.filter((t) => t.category === category);
     }
     res.json({
       success: true,
       tasks: list,
-      totalCount: serverTasks.length,
+      totalCount: list.length,
       categoryCounts: {
-        ads: serverTasks.filter((t) => t.category === 'ads').length,
-        visit: serverTasks.filter((t) => t.category === 'visit').length,
-        telegram: serverTasks.filter((t) => t.category === 'telegram').length,
-        mission: serverTasks.filter((t) => t.category === 'mission').length,
-        special: serverTasks.filter((t) => t.category === 'special').length,
+        ads: list.filter((t) => t.category === 'ads').length,
+        visit: list.filter((t) => t.category === 'visit').length,
+        telegram: list.filter((t) => t.category === 'telegram').length,
+        mission: list.filter((t) => t.category === 'mission').length,
+        special: list.filter((t) => t.category === 'special').length,
       },
     });
   });
@@ -1026,6 +1302,14 @@ async function startServer() {
     serverTasks.unshift(newTask);
     saveJsonFile("tasks.json", serverTasks);
 
+    if (githubSyncConfig.token && githubSyncConfig.repo && githubSyncConfig.autoSyncOnChange) {
+      pushFileToGitHubDirect(
+        "data/tasks.json",
+        JSON.stringify(serverTasks, null, 2),
+        `Admin: Add task "${newTask.title}"`
+      ).catch(() => {});
+    }
+
     res.json({
       success: true,
       message: "নতুন টাস্ক সফলভাবে তৈরি ও যুক্ত করা হয়েছে!",
@@ -1078,6 +1362,14 @@ async function startServer() {
     serverTasks[taskIndex] = updatedTask;
     saveJsonFile("tasks.json", serverTasks);
 
+    if (githubSyncConfig.token && githubSyncConfig.repo && githubSyncConfig.autoSyncOnChange) {
+      pushFileToGitHubDirect(
+        "data/tasks.json",
+        JSON.stringify(serverTasks, null, 2),
+        `Admin: Update task "${updatedTask.title}"`
+      ).catch(() => {});
+    }
+
     res.json({
       success: true,
       message: "টাস্ক সফলভাবে আপডেট করা হয়েছে!",
@@ -1085,21 +1377,44 @@ async function startServer() {
     });
   });
 
-  // Admin: Delete a task
-  app.post("/api/admin/tasks/delete", (req, res) => {
+  // Admin: Delete a task (Permanently blacklisted so it never returns on refresh or restart)
+  app.post("/api/admin/tasks/delete", async (req, res) => {
     const { id } = req.body || {};
-    const initialLen = serverTasks.length;
-    serverTasks = serverTasks.filter((t) => t.id !== id);
+    if (!id) return res.status(400).json({ error: "Task ID required" });
 
-    if (serverTasks.length === initialLen) {
-      return res.status(404).json({ error: "টাস্কটি পাওয়া যায়নি বা ইতোমধ্যে ডিলিট করা হয়েছে।" });
+    if (!deletedTaskIds.includes(id)) {
+      deletedTaskIds.push(id);
+      saveJsonFile("deleted_task_ids.json", deletedTaskIds);
     }
+
+    serverTasks = serverTasks.filter((t) => t.id !== id);
     saveJsonFile("tasks.json", serverTasks);
+
+    let githubPushed = false;
+    if (githubSyncConfig.token && githubSyncConfig.repo) {
+      try {
+        await pushFileToGitHubDirect(
+          "data/tasks.json",
+          JSON.stringify(serverTasks, null, 2),
+          `Admin: Delete task (${serverTasks.length} tasks remaining)`
+        );
+        await pushFileToGitHubDirect(
+          "data/deleted_task_ids.json",
+          JSON.stringify(deletedTaskIds, null, 2),
+          `Admin: Update deleted task IDs list`
+        );
+        githubPushed = true;
+      } catch (ghErr) {
+        console.warn("GitHub push on task delete failed:", ghErr);
+      }
+    }
 
     res.json({
       success: true,
-      message: "টাস্ক সফলভাবে ডিলিট করা হয়েছে!",
+      message: "টাস্ক সফলভাবে ডিলিট করা হয়েছে এবং পার্মানেন্টলি ব্ল্যাকলিস্ট করা হয়েছে!",
       deletedId: id,
+      githubPushed,
+      remainingCount: serverTasks.length,
     });
   });
 
@@ -1112,6 +1427,15 @@ async function startServer() {
     }
     task.isActive = !task.isActive;
     saveJsonFile("tasks.json", serverTasks);
+
+    if (githubSyncConfig.token && githubSyncConfig.repo && githubSyncConfig.autoSyncOnChange) {
+      pushFileToGitHubDirect(
+        "data/tasks.json",
+        JSON.stringify(serverTasks, null, 2),
+        `Admin: Toggle task active status (${task.id})`
+      ).catch(() => {});
+    }
+
     res.json({
       success: true,
       message: task.isActive ? "টাস্কটি চালু (Active) করা হয়েছে" : "টাস্কটি সাময়িকভাবে বন্ধ (Inactive) করা হয়েছে",
@@ -1196,6 +1520,14 @@ async function startServer() {
     if (enforceOnEveryVisit !== undefined) telegramConfig.enforceOnEveryVisit = Boolean(enforceOnEveryVisit);
     if (allowDevBypass !== undefined) (telegramConfig as any).allowDevBypass = Boolean(allowDevBypass);
     saveJsonFile("telegram_config.json", telegramConfig);
+
+    if (githubSyncConfig.token && githubSyncConfig.repo && githubSyncConfig.autoSyncOnChange) {
+      pushFileToGitHubDirect(
+        "data/telegram_config.json",
+        JSON.stringify(telegramConfig, null, 2),
+        "Admin: Update Telegram and Channel Settings"
+      ).catch(() => {});
+    }
 
     res.json({
       success: true,
@@ -1538,7 +1870,7 @@ async function startServer() {
 
   // Videos list
   app.get("/api/videos", (_req, res) => {
-    res.json(serverVideos);
+    res.json(serverVideos.filter((v) => !deletedVideoIds.includes(v.id)));
   });
 
   // Admin API: Stats & Overview
@@ -1555,6 +1887,7 @@ async function startServer() {
         totalUsers: userList.length,
         pendingWithdrawals: pendingCount,
         totalPaidUsd: totalPaid.toFixed(2),
+        totalPaidBdt: (totalPaid * 120).toFixed(2),
         totalVideos: serverVideos.length,
       },
       users: userList,
@@ -1631,6 +1964,15 @@ async function startServer() {
     };
     serverVideos.unshift(newVideo as any);
     saveJsonFile("videos.json", serverVideos);
+
+    if (githubSyncConfig.token && githubSyncConfig.repo && githubSyncConfig.autoSyncOnChange) {
+      pushFileToGitHubDirect(
+        "data/videos.json",
+        JSON.stringify(serverVideos, null, 2),
+        `Admin: Add video task "${newVideo.title}"`
+      ).catch(() => {});
+    }
+
     res.json({ success: true, video: newVideo });
   });
 
@@ -1651,15 +1993,48 @@ async function startServer() {
       thumbnail: thumbnail !== undefined ? thumbnail.trim() : serverVideos[index].thumbnail,
     };
     saveJsonFile("videos.json", serverVideos);
+
+    if (githubSyncConfig.token && githubSyncConfig.repo && githubSyncConfig.autoSyncOnChange) {
+      pushFileToGitHubDirect(
+        "data/videos.json",
+        JSON.stringify(serverVideos, null, 2),
+        `Admin: Update video task "${serverVideos[index].title}"`
+      ).catch(() => {});
+    }
+
     res.json({ success: true, video: serverVideos[index] });
   });
 
-  // Admin API: Delete video task
-  app.post("/api/admin/videos/delete", (req, res) => {
+  // Admin API: Delete video task (Permanently blacklisted so it never returns)
+  app.post("/api/admin/videos/delete", async (req, res) => {
     const { id } = req.body;
+    if (id && !deletedVideoIds.includes(id)) {
+      deletedVideoIds.push(id);
+      saveJsonFile("deleted_video_ids.json", deletedVideoIds);
+    }
     serverVideos = serverVideos.filter((v) => v.id !== id);
     saveJsonFile("videos.json", serverVideos);
-    res.json({ success: true, remaining: serverVideos.length });
+
+    let githubPushed = false;
+    if (githubSyncConfig.token && githubSyncConfig.repo) {
+      try {
+        await pushFileToGitHubDirect(
+          "data/videos.json",
+          JSON.stringify(serverVideos, null, 2),
+          `Admin: Delete video task (${serverVideos.length} remaining)`
+        );
+        await pushFileToGitHubDirect(
+          "data/deleted_video_ids.json",
+          JSON.stringify(deletedVideoIds, null, 2),
+          `Admin: Update deleted video IDs list`
+        );
+        githubPushed = true;
+      } catch (ghErr) {
+        console.warn("GitHub push on video delete failed:", ghErr);
+      }
+    }
+
+    res.json({ success: true, remaining: serverVideos.length, githubPushed });
   });
 
   // Admin API: Broadcast notification (Add, Edit, Update, Toggle)
@@ -1674,6 +2049,15 @@ async function startServer() {
     }
     saveJsonFile("notices.json", noticesConfig);
     console.log(`[Admin Broadcast Updated]`, noticesConfig.broadcastNotice);
+
+    if (githubSyncConfig.token && githubSyncConfig.repo && githubSyncConfig.autoSyncOnChange) {
+      pushFileToGitHubDirect(
+        "data/notices.json",
+        JSON.stringify(noticesConfig, null, 2),
+        "Admin: Update Broadcast Notice"
+      ).catch(() => {});
+    }
+
     res.json({
       success: true,
       message: "ব্রডকাস্ট নোটিশ সফলভাবে আপডেট ও সেভ হয়েছে!",
@@ -1688,6 +2072,15 @@ async function startServer() {
       ? Boolean(isActive) 
       : !noticesConfig.broadcastNotice.isActive;
     saveJsonFile("notices.json", noticesConfig);
+
+    if (githubSyncConfig.token && githubSyncConfig.repo && githubSyncConfig.autoSyncOnChange) {
+      pushFileToGitHubDirect(
+        "data/notices.json",
+        JSON.stringify(noticesConfig, null, 2),
+        "Admin: Toggle Broadcast Notice"
+      ).catch(() => {});
+    }
+
     res.json({ success: true, broadcastNotice: noticesConfig.broadcastNotice });
   });
 
@@ -1702,6 +2095,14 @@ async function startServer() {
     if (isActive !== undefined) noticesConfig.officialNotice.isActive = Boolean(isActive);
     noticesConfig.officialNotice.updatedAt = new Date().toISOString();
     saveJsonFile("notices.json", noticesConfig);
+
+    if (githubSyncConfig.token && githubSyncConfig.repo && githubSyncConfig.autoSyncOnChange) {
+      pushFileToGitHubDirect(
+        "data/notices.json",
+        JSON.stringify(noticesConfig, null, 2),
+        "Admin: Update Official Notice"
+      ).catch(() => {});
+    }
 
     res.json({
       success: true,
@@ -3384,6 +3785,55 @@ async function startServer() {
     }
   });
 
+  // 5. Universal Master Save endpoint (Saves all modules and auto-commits to GitHub)
+  app.post("/api/admin/master-save", async (_req, res) => {
+    try {
+      // Save all current memory state to disk first
+      saveJsonFile("packages.json", serverPackages);
+      saveJsonFile("deleted_package_ids.json", deletedPackageIds);
+      saveJsonFile("tasks.json", serverTasks);
+      saveJsonFile("deleted_task_ids.json", deletedTaskIds);
+      saveJsonFile("videos.json", serverVideos);
+      saveJsonFile("deleted_video_ids.json", deletedVideoIds);
+      saveJsonFile("ad_videos.json", serverAdLockedVideos);
+      saveJsonFile("income_methods_config.json", incomeMethodsConfig);
+      saveJsonFile("telegram_config.json", telegramConfig);
+      saveJsonFile("notices.json", noticesConfig);
+      saveJsonFile("payment_config.json", serverPaymentConfig);
+      saveJsonFile("users.json", usersMap);
+      saveJsonFile("orders.json", serverOrders);
+      saveJsonFile("withdrawals.json", withdrawals);
+
+      // Push all to GitHub if configured
+      const ghResult = await pushAllDataToGitHub();
+
+      res.json({
+        success: true,
+        savedToDisk: true,
+        githubSynced: ghResult.success,
+        message: ghResult.message,
+        pushedCount: ghResult.successCount,
+        totalCount: ghResult.totalCount,
+        results: ghResult.results,
+        lastSyncedAt: githubSyncConfig.lastSyncedAt,
+      });
+    } catch (err: any) {
+      console.error("[Master Save Error]:", err);
+      res.status(500).json({ error: "মাস্টার সেভ ব্যর্থ: " + err.message });
+    }
+  });
+
+  // 6. Universal Master Pull endpoint (Pulls all fresh data from GitHub and updates live server)
+  app.post("/api/admin/master-pull", async (_req, res) => {
+    try {
+      const pullResult = await pullAllDataFromGitHub();
+      res.json(pullResult);
+    } catch (err: any) {
+      console.error("[Master Pull Error]:", err);
+      res.status(500).json({ error: "মাস্টার সিঙ্ক ব্যর্থ: " + err.message });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -3401,6 +3851,11 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
+
+    // Attempt startup hydration from GitHub after 3 seconds
+    setTimeout(() => {
+      hydrateServerFromGitHub().catch(() => {});
+    }, 3000);
 
     // Anti-Sleep / 24/7 Keep-Alive Background Service for Render
     const renderUrl = process.env.RENDER_EXTERNAL_URL || process.env.APP_URL;
