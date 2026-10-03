@@ -10,6 +10,28 @@ export interface ReferralCommissionLog {
   time: string;
 }
 
+export interface DailyWorkRecord {
+  date: string; // YYYY-MM-DD
+  dayLabel: string; // e.g. "আজকে", "গতকাল", "শনিবার", etc.
+  adsWatched: number;
+  tasksCompleted: number;
+  adClicks: number;
+  earnedUsd: number;
+  earnedBdt: number;
+  referrals: number;
+}
+
+export interface UserPersonalMessage {
+  id: string;
+  type: 'warning' | 'notice' | 'message' | 'bonus';
+  title: string;
+  message: string;
+  createdAt: string;
+  isRead: boolean;
+  sentBy?: string;
+  sentToTelegram?: boolean;
+}
+
 export interface UserProfile {
   id: string;
   username: string;
@@ -37,6 +59,8 @@ export interface UserProfile {
   totalCommissionEarnedUsd?: number;
   claimableCommissionUsd?: number;
   referralCommissionHistory?: ReferralCommissionLog[];
+  weeklyWorkHistory?: DailyWorkRecord[]; // Rolling 7-day work history
+  personalNotifications?: UserPersonalMessage[]; // Individual warnings & messages
   createdAt: string;
 }
 
@@ -243,7 +267,9 @@ export interface ChannelPublisherPost {
   targetChannel: string;
   title: string;
   description: string;
-  thumbnail: string;
+  mediaType?: 'image' | 'video';
+  thumbnail?: string;
+  videoUrl?: string;
   demoUrl: string;
   fullVideoUrl: string;
   tutorialUrl: string;

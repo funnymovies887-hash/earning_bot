@@ -54,14 +54,14 @@ export function initMonetagInAppAds() {
       window.show_11898539({
         type: 'inApp',
         inAppSettings: {
-          frequency: 2,
+          frequency: 4,
           capping: 1, // 1 hour capping
-          interval: 600, // 10 minutes between ads
-          timeout: 600, // 10 minutes delay on first entrance (no 5-10s popup!)
+          interval: 120, // 2 minutes between ads (as requested by user)
+          timeout: 120, // 2 minutes delay after entering mini app
           everyPage: false,
         },
       });
-      console.log('[Monetag] In-App Interstitial initialized (10-min interval, no entry popup)');
+      console.log('[Monetag] In-App Interstitial initialized (2-minute interval)');
     } catch (e) {
       console.warn('[Monetag] Failed to initialize inApp ads:', e);
     }

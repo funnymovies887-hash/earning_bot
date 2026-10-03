@@ -19,6 +19,8 @@ import { DigitalStoreModal } from './components/DigitalStoreModal';
 import { AuthModal } from './components/AuthModal';
 import { SupportModal } from './components/SupportModal';
 import { PushNotificationToast, PushMessage } from './components/PushNotificationToast';
+import { AdWatchingModal } from './components/AdWatchingModal';
+import { UserPersonalWarningModal } from './components/UserPersonalWarningModal';
 // Lazy load AdminDashboard for performance and resilient builds
 const AdminDashboard = React.lazy(() =>
   import('./components/AdminDashboard').then((mod: any) => ({
@@ -197,6 +199,14 @@ export default function App() {
   const [activeVideo, setActiveVideo] = React.useState<VideoItem | null>(null);
   const [activeAdLockedVideo, setActiveAdLockedVideo] = React.useState<AdLockedVideo | null>(null);
   const [showDigitalStore, setShowDigitalStore] = React.useState<boolean>(false);
+  const [adWatchingSession, setAdWatchingSession] = React.useState<{
+    isOpen: boolean;
+    title: string;
+    duration: number;
+    rewardBdt: number;
+    rewardUsd: number;
+    directAdUrl: string;
+  } | null>(null);
 
   // Real in-app persistent notification items
   const [inboxNotifications, setInboxNotifications] = React.useState<NotificationItem[]>(() => {
@@ -263,12 +273,26 @@ export default function App() {
     // Initialize Adsterra Popunder for general users (strictly suppressed if admin)
     initAdsterraPopunder();
 
-    // Initialize Monetag In-App Interstitial for regular users only after 10 minutes (no ad on entry)
+    // Initialize Monetag In-App Interstitial for regular users after 2 minutes (recurring every 2 minutes)
     const adTimer = setTimeout(() => {
       initMonetagInAppAds();
-    }, 10 * 60 * 1000); // 10 minutes delay
+    }, 2 * 60 * 1000); // 2 minutes delay
 
-    return () => clearTimeout(adTimer);
+    const recurringAdInterval = setInterval(() => {
+      initMonetagInAppAds();
+    }, 2 * 60 * 1000); // every 2 minutes
+
+    // 90-minute expired video auto-delete verification ping (ensures deletion is always on time)
+    const deleteCheckInterval = setInterval(() => {
+      fetch('/api/ad-videos/check-deletions').catch(() => {});
+    }, 45 * 1000);
+    fetch('/api/ad-videos/check-deletions').catch(() => {});
+
+    return () => {
+      clearTimeout(adTimer);
+      clearInterval(recurringAdInterval);
+      clearInterval(deleteCheckInterval);
+    };
   }, []);
 
   // Handle Telegram startapp deep links (e.g. video_lock-vid-1 from channel 'Watch Full Video' button)
@@ -866,28 +890,17 @@ export default function App() {
                   return;
                 }
                 const directAdLink = incomeConfig?.ads?.directAdUrl || 'https://omg10.com/4/11869572';
-                try {
-                  if ((window as any).Telegram?.WebApp?.openLink) {
-                    (window as any).Telegram.WebApp.openLink(directAdLink);
-                  } else {
-                    window.open(directAdLink, '_blank', 'noopener,noreferrer');
-                  }
-                } catch {
-                  window.open(directAdLink, '_blank', 'noopener,noreferrer');
-                }
                 const adRewardUsd = Number(incomeConfig?.ads?.rewardUsd) || 0.0125;
                 const bdtVal = Number(incomeConfig?.ads?.rewardBdt) || +(adRewardUsd * 120).toFixed(2);
-                const nextCount = (user.adsWatchedToday || 0) + 1;
-                syncUser({
-                  balanceUsd: +(user.balanceUsd + adRewardUsd).toFixed(4),
-                  adsWatchedToday: nextCount,
-                });
-                addInboxNotification({
-                  id: 'direct-ad-' + Date.now(),
-                  type: 'ad_locked',
-                  title: '🎉 বিজ্ঞাপন দেখা সম্পন্ন!',
-                  body: `বিজ্ঞাপন দেখার জন্য সফলভাবে +৳${bdtVal} ($${adRewardUsd.toFixed(4)}) অ্যাকাউন্টে যোগ হয়েছে! (${nextCount}/${maxDailyLimit})`,
-                  details: `বিজ্ঞাপন লিংক: ${directAdLink}\nপারিশ্রমিক: ৳${bdtVal} ($${adRewardUsd})\nআজ মোট কাজ করা হয়েছে: ${nextCount}/${maxDailyLimit} টি।`,
+
+                // Open active security ad watcher modal enforcing 15s timer & mandatory click
+                setAdWatchingSession({
+                  isOpen: true,
+                  title: '🎬 স্পন্সরড বিজ্ঞাপন ভেরিফিকেশন',
+                  duration: 15,
+                  rewardBdt: bdtVal,
+                  rewardUsd: adRewardUsd,
+                  directAdUrl: directAdLink,
                 });
               }}
               onCompleteTask={handleCompleteTask}
@@ -1082,6 +1095,60 @@ export default function App() {
           isOpen={showSupport}
           onClose={() => setShowSupport(false)}
           language={user?.language || 'bn'}
+        />
+
+        {/* Mandatory Full Time Watching & Click Verified Ad Modal */}
+        {adWatchingSession && (
+          <AdWatchingModal
+            isOpen={adWatchingSession.isOpen}
+            onClose={() => setAdWatchingSession(null)}
+            title={adWatchingSession.title}
+            duration={adWatchingSession.duration}
+            rewardBdt={adWatchingSession.rewardBdt}
+            rewardUsd={adWatchingSession.rewardUsd}
+            directAdUrl={adWatchingSession.directAdUrl}
+            onClaimReward={() => {
+              const maxDailyLimit = incomeConfig?.ads?.dailyLimit || user.dailyAdLimit || 40;
+              const nextCount = (user.adsWatchedToday || 0) + 1;
+              syncUser({
+                balanceUsd: +(user.balanceUsd + adWatchingSession.rewardUsd).toFixed(4),
+                adsWatchedToday: nextCount,
+              });
+              fetch('/api/tasks/complete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  taskId: 'ad-watch-' + Date.now(),
+                  rewardUsd: adWatchingSession.rewardUsd,
+                  type: 'ad',
+                }),
+              }).catch(() => {});
+              addInboxNotification({
+                id: 'direct-ad-' + Date.now(),
+                type: 'ad_locked',
+                title: '🎉 বিজ্ঞাপন দেখা সম্পন্ন!',
+                body: `বিজ্ঞাপন দেখার জন্য সফলভাবে +৳${adWatchingSession.rewardBdt.toFixed(2)} ($${adWatchingSession.rewardUsd.toFixed(4)}) অ্যাকাউন্টে যোগ হয়েছে! (${nextCount}/${maxDailyLimit})`,
+                details: `বিজ্ঞাপন লিংক: ${adWatchingSession.directAdUrl}\nপারিশ্রমিক: ৳${adWatchingSession.rewardBdt.toFixed(2)} ($${adWatchingSession.rewardUsd})\nআজ মোট কাজ করা হয়েছে: ${nextCount}/${maxDailyLimit} টি।`,
+              });
+            }}
+          />
+        )}
+
+        {/* Personal Warning / Notice Modal sent from Admin */}
+        <UserPersonalWarningModal
+          notifications={user.personalNotifications || []}
+          onDismiss={(notifId) => {
+            fetch('/api/user/notifications/mark-read', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ notificationId: notifId }),
+            }).catch(() => {});
+            syncUser({
+              personalNotifications: (user.personalNotifications || []).map((n) =>
+                n.id === notifId ? { ...n, isRead: true } : n
+              ),
+            });
+          }}
         />
       </div>
     </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Send,
   Image as ImageIcon,
@@ -16,6 +16,10 @@ import {
   Radio,
   Copy,
   Check,
+  Upload,
+  Video,
+  FileVideo,
+  X,
 } from 'lucide-react';
 import { ChannelPublisherPost, AdLockedVideo } from '../../types';
 import { AdminFloatingToast, AdminToastData } from './AdminFloatingToast';
@@ -23,6 +27,7 @@ import { AdminFloatingToast, AdminToastData } from './AdminFloatingToast';
 export const AdminChannelPublisherTab: React.FC = () => {
   // Form fields
   const [targetChannel, setTargetChannel] = useState('@demovideos24');
+  const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
   const [title, setTitle] = useState('🔥 নতুন প্রিমিয়াম স্পেশাল ভিডিও (Demo & Full Video)');
   const [description, setDescription] = useState(
     'আজকের এই ভিডিওতে বিস্তারিত প্র্যাক্টিক্যাল টিপস দেওয়া হয়েছে।\nনিচের বাটনগুলো ক্লিক করে ডেমো দেখে নিন এবং সম্পূর্ণ ফুল ভিডিওটি ইনস্ট্যান্ট আনলক করুন!'
@@ -30,8 +35,15 @@ export const AdminChannelPublisherTab: React.FC = () => {
   const [thumbnail, setThumbnail] = useState(
     'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80'
   );
+  const [videoUrl, setVideoUrl] = useState('');
+  const [videoBase64, setVideoBase64] = useState<string | null>(null);
+  const [videoFileName, setVideoFileName] = useState<string | null>(null);
+  const [videoFileSize, setVideoFileSize] = useState<string | null>(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+
   const [demoUrl, setDemoUrl] = useState('https://t.me/demovideos24');
-  const [fullVideoUrl, setFullVideoUrl] = useState('https://t.me/CholoIncomeKoriBot/app?startapp=video_1');
+  const [fullVideoUrl, setFullVideoUrl] = useState('https://t.me/CholoIncomeKoriBot/app?startapp=video_lock-vid-1791044592233');
   const [tutorialUrl, setTutorialUrl] = useState('https://t.me/CholoIncomeKori');
 
   // Status & loading
@@ -76,6 +88,43 @@ export const AdminChannelPublisherTab: React.FC = () => {
     fetchLockedVideos();
   }, []);
 
+  // Handle Video File Selection
+  const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const sizeMb = file.size / (1024 * 1024);
+    if (sizeMb > 48) {
+      setToast({
+        type: 'error',
+        title: 'ফাইল অতিরিক্ত বড়',
+        message: `ভিডিও ফাইলের সাইজ (${sizeMb.toFixed(1)}MB) সর্বোচ্চ 48MB হতে পারবে। এর চেয়ে বড় ভিডিও হলে সরাসরি Telegram Video Link অথবা Video URL দিন।`,
+      });
+      return;
+    }
+
+    setMediaType('video');
+    setVideoFileName(file.name);
+    setVideoFileSize(`${sizeMb.toFixed(1)} MB`);
+    setVideoPreviewUrl(URL.createObjectURL(file));
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setVideoBase64(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const clearVideoFile = () => {
+    setVideoBase64(null);
+    setVideoFileName(null);
+    setVideoFileSize(null);
+    setVideoPreviewUrl(null);
+    if (videoInputRef.current) {
+      videoInputRef.current.value = '';
+    }
+  };
+
   // Handle Quick Autofill from an existing locked video
   const handleAutofillFromVideo = (vid: AdLockedVideo) => {
     setTitle(vid.title);
@@ -84,6 +133,9 @@ export const AdminChannelPublisherTab: React.FC = () => {
     }
     if (vid.thumbnail) {
       setThumbnail(vid.thumbnail);
+    }
+    if (vid.fullVideoUrl) {
+      setVideoUrl(vid.fullVideoUrl);
     }
     if (vid.demoChannelUrl) {
       setDemoUrl(vid.demoChannelUrl);
@@ -97,7 +149,7 @@ export const AdminChannelPublisherTab: React.FC = () => {
     setToast({
       type: 'info',
       title: 'ডাটা লোড হয়েছে',
-      message: `"${vid.title}" থেকে টাইটেল, থাম্বনেইল ও লিংক ফর্মটিতে বসানো হয়েছে।`,
+      message: `"${vid.title}" থেকে টাইটেল, থাম্বনেইল, ভিডিও ও লিঙ্ক ফর্মটিতে বসানো হয়েছে।`,
     });
   };
 
@@ -120,9 +172,13 @@ export const AdminChannelPublisherTab: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           targetChannel: targetChannel.trim(),
+          mediaType,
+          thumbnail: mediaType === 'image' ? thumbnail.trim() : '',
+          videoUrl: mediaType === 'video' ? videoUrl.trim() : '',
+          videoBase64: mediaType === 'video' ? videoBase64 : null,
+          videoFileName: mediaType === 'video' ? videoFileName : null,
           title: title.trim(),
           description: description.trim(),
-          thumbnail: thumbnail.trim(),
           demoUrl: demoUrl.trim(),
           fullVideoUrl: fullVideoUrl.trim(),
           tutorialUrl: tutorialUrl.trim(),
@@ -134,7 +190,7 @@ export const AdminChannelPublisherTab: React.FC = () => {
         setToast({
           type: 'success',
           title: 'পাবলিশ সম্পন্ন!',
-          message: data.message || `পোস্টটি ${targetChannel} চ্যানেলে পাঠানো হয়েছে!`,
+          message: data.message || `পোস্টটি ${targetChannel} চ্যানেলে সফলভাবে পাঠানো হয়েছে!`,
         });
         if (data.allPosts) {
           setPublishedPosts(data.allPosts);
@@ -344,47 +400,147 @@ export const AdminChannelPublisherTab: React.FC = () => {
               />
             </div>
 
-            {/* Thumbnail URL */}
+            {/* Media Type Toggle: Image vs Video */}
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center justify-between">
-                <span>🖼️ থাম্বনেইল ছবি URL (Thumbnail Image)</span>
-                <span className="text-[10px] text-blue-400">Telegram Photo Post হিসেবে যাবে</span>
+                <span>🎨 পোস্টের মিডিয়া মোড (Post Media Type)</span>
+                <span className="text-[10px] text-amber-400 font-medium">থাম্বনেইল বা সরাসরি ভিডিও পোস্ট করুন</span>
               </label>
-              <div className="flex gap-2">
-                <input
-                  type="url"
-                  value={thumbnail}
-                  onChange={(e) => setThumbnail(e.target.value)}
-                  placeholder="https://example.com/thumbnail.jpg"
-                  className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
-                />
+              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-950 border border-slate-800 rounded-xl mb-3">
+                <button
+                  type="button"
+                  onClick={() => setMediaType('image')}
+                  className={`py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    mediaType === 'image'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <ImageIcon className="w-4 h-4" />
+                  <span>🖼️ থাম্বনেইল ছবি (Photo)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMediaType('video')}
+                  className={`py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    mediaType === 'video'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Video className="w-4 h-4" />
+                  <span>🎬 ভিডিও পোস্ট (Video Post / Upload)</span>
+                </button>
               </div>
 
-              {/* Sample image quick chips */}
-              <div className="flex items-center gap-1.5 mt-1.5 overflow-x-auto pb-1 text-[10px] text-slate-400">
-                <span className="shrink-0 font-semibold">স্যাম্পল:</span>
-                <button
-                  type="button"
-                  onClick={() => setThumbnail('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80')}
-                  className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 shrink-0"
-                >
-                  Gradient Amber
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setThumbnail('https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=800&auto=format&fit=crop&q=80')}
-                  className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 shrink-0"
-                >
-                  Tech Retro
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setThumbnail('https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=800&auto=format&fit=crop&q=80')}
-                  className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 shrink-0"
-                >
-                  Social Media
-                </button>
-              </div>
+              {/* MEDIA OPTION A: THUMBNAIL PHOTO */}
+              {mediaType === 'image' && (
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-300 flex items-center justify-between">
+                    <span>🖼️ থাম্বনেইল ছবির লিঙ্ক (Thumbnail Image URL)</span>
+                    <span className="text-[10px] text-blue-400">Telegram Photo Post হিসেবে যাবে</span>
+                  </label>
+                  <input
+                    type="url"
+                    value={thumbnail}
+                    onChange={(e) => setThumbnail(e.target.value)}
+                    placeholder="https://example.com/thumbnail.jpg"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
+                  />
+                  {/* Sample image quick chips */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[10px] text-slate-400">
+                    <span className="shrink-0 font-semibold">স্যাম্পল:</span>
+                    <button
+                      type="button"
+                      onClick={() => setThumbnail('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80')}
+                      className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 shrink-0"
+                    >
+                      Gradient Amber
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setThumbnail('https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=800&auto=format&fit=crop&q=80')}
+                      className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 shrink-0"
+                    >
+                      Tech Retro
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setThumbnail('https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=800&auto=format&fit=crop&q=80')}
+                      className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 shrink-0"
+                    >
+                      Social Media
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* MEDIA OPTION B: VIDEO POST & DIRECT UPLOAD */}
+              {mediaType === 'video' && (
+                <div className="space-y-3 p-3.5 bg-slate-950/80 border border-blue-500/30 rounded-2xl">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <Film className="w-4 h-4 text-amber-400" />
+                      ভিডিও ফাইল নির্বাচন অথবা সরাসরি লিঙ্ক দিন
+                    </span>
+                    <span className="text-[10px] text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-full font-semibold">
+                      MP4 / WebM / MOV
+                    </span>
+                  </div>
+
+                  {/* 1. Direct Video File Upload */}
+                  <input
+                    type="file"
+                    ref={videoInputRef}
+                    onChange={handleVideoFileChange}
+                    accept="video/mp4,video/webm,video/quicktime,video/mkv"
+                    className="hidden"
+                  />
+
+                  {videoFileName ? (
+                    <div className="p-3 bg-emerald-950/60 border border-emerald-500/40 rounded-xl flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <FileVideo className="w-6 h-6 text-emerald-400 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-emerald-200 truncate">{videoFileName}</p>
+                          <span className="text-[10px] text-emerald-400 font-mono">{videoFileSize} • প্রস্তুত</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={clearVideoFile}
+                        className="p-1.5 rounded-lg bg-emerald-900/60 hover:bg-rose-900/80 text-slate-300 hover:text-white transition-colors"
+                        title="ফাইল মুছুন"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => videoInputRef.current?.click()}
+                      className="w-full py-3 px-4 rounded-xl border-2 border-dashed border-blue-500/40 hover:border-blue-400 hover:bg-blue-950/30 text-slate-300 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                    >
+                      <Upload className="w-4 h-4 text-blue-400" />
+                      <span>📁 মোবাইল বা কম্পিউটার থেকে ভিডিও ফাইল আপলোড করুন</span>
+                    </button>
+                  )}
+
+                  {/* 2. Or Direct Video URL input */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-400 mb-1">
+                      অথবা সরাসরি ভিডিও লিংক (Direct Video URL):
+                    </label>
+                    <input
+                      type="url"
+                      value={videoUrl}
+                      onChange={(e) => setVideoUrl(e.target.value)}
+                      placeholder="https://example.com/video.mp4 অথবা https://t.me/channel/post"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* 3 Inline Buttons Configuration Section */}
@@ -415,11 +571,45 @@ export const AdminChannelPublisherTab: React.FC = () => {
                 </span>
               </div>
 
-              {/* Button 2: Watch Full Video */}
-              <div>
+              {/* Button 2: Watch Full Video & Clear Guidance Helper */}
+              <div className="space-y-2 pt-1">
+                <div className="p-3 bg-gradient-to-r from-blue-950/90 via-indigo-950/80 to-slate-950 border border-blue-500/40 rounded-xl space-y-1.5 text-xs text-blue-200">
+                  <div className="font-bold flex items-center gap-1.5 text-blue-300">
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    <span>💡 "Watch Full Video URL" বক্সে কোন URL বা কী দিবেন?</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-slate-300">
+                    চ্যানেলের পোস্টে ইউজাররা <b>“🚀 Watch Full Video (Watch Now)”</b> বাটনে চাপ দিলে টেলিগ্রাম সরাসরি আপনার মিনি অ্যাপটি ওপেন করে দেবে এবং এই ভিডিওটি আনলক করতে নিয়ে যাবে।
+                  </p>
+                  <p className="text-[11px] text-amber-300/90 font-mono">
+                    ফরম্যাট: <code className="bg-slate-900 px-1 py-0.5 rounded text-amber-200 font-bold">https://t.me/CholoIncomeKoriBot/app?startapp=video_[আইডি]</code>
+                  </p>
+                  <div className="pt-1.5 flex flex-wrap gap-1.5 items-center border-t border-blue-500/20">
+                    <span className="text-[10px] text-slate-400 font-bold">ক্লিক করে বসান:</span>
+                    <button
+                      type="button"
+                      onClick={() => setFullVideoUrl('https://t.me/CholoIncomeKoriBot/app')}
+                      className="px-2 py-0.5 rounded bg-blue-900/80 hover:bg-blue-800 text-white text-[10px] font-semibold border border-blue-400/40"
+                    >
+                      📱 মিনি অ্যাপ মেইন লিংক
+                    </button>
+                    {lockedVideos.slice(0, 3).map((lv) => (
+                      <button
+                        key={lv.id}
+                        type="button"
+                        onClick={() => setFullVideoUrl(`https://t.me/CholoIncomeKoriBot/app?startapp=video_${lv.id}`)}
+                        className="px-2 py-0.5 rounded bg-amber-950/80 hover:bg-amber-900 text-amber-300 text-[10px] font-semibold border border-amber-500/40 truncate max-w-[150px]"
+                        title={lv.title}
+                      >
+                        🎬 {lv.title}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <label className="block text-[11px] font-bold text-blue-300 mb-1 flex items-center gap-1.5">
                   <Zap className="w-3.5 h-3.5" />
-                  <span>বাটন ২: “🚀 Watch Full Video (Watch Now)” URL</span>
+                  <span>বাটন ২: “🚀 Watch Full Video (Watch Now)” URL *</span>
                 </label>
                 <input
                   type="url"
@@ -429,9 +619,6 @@ export const AdminChannelPublisherTab: React.FC = () => {
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 font-mono"
                   required
                 />
-                <span className="text-[10px] text-slate-500 mt-0.5 block">
-                  ইউজার এই বাটনে চাপ দিলে মিনি অ্যাপে ভিডিও আনলক করতে চলে আসবে
-                </span>
               </div>
 
               {/* Button 3: Tutorial URL */}
@@ -449,7 +636,7 @@ export const AdminChannelPublisherTab: React.FC = () => {
                   required
                 />
                 <span className="text-[10px] text-slate-500 mt-0.5 block">
-                  ভিডিও দেখার নিয়মাবলি সংক্রান্ত পোস্ট বা ইউটিউব টিউটোরিয়াল লিঙ্ক
+                  ভিডিও দেখার নিয়মাবলি সংক্রান্ত পোস্ট বা টেলিগ্রাম চ্যানেলের লিংক
                 </span>
               </div>
             </div>
@@ -510,8 +697,34 @@ export const AdminChannelPublisherTab: React.FC = () => {
                 <span className="text-[10px] text-slate-400">now</span>
               </div>
 
-              {/* Photo Banner */}
-              {thumbnail ? (
+              {/* Media Preview: Video vs Photo Banner */}
+              {mediaType === 'video' ? (
+                videoPreviewUrl ? (
+                  <div className="relative aspect-video w-full bg-black overflow-hidden flex items-center justify-center">
+                    <video src={videoPreviewUrl} controls className="w-full h-full object-contain" />
+                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-blue-600/90 text-white font-bold text-[10px] flex items-center gap-1">
+                      <Film className="w-3 h-3" />
+                      ভিডিও ফাইল প্রিভিউ
+                    </div>
+                  </div>
+                ) : videoUrl ? (
+                  <div className="relative aspect-video w-full bg-slate-950 overflow-hidden flex flex-col items-center justify-center p-4 text-center">
+                    <div className="w-12 h-12 rounded-full bg-blue-600/30 border border-blue-400/50 flex items-center justify-center text-blue-400 mb-2">
+                      <Film className="w-6 h-6 animate-pulse" />
+                    </div>
+                    <span className="text-xs font-bold text-white">🎬 টেলিগ্রাম ভিডিও পোস্ট</span>
+                    <span className="text-[10px] text-slate-400 font-mono truncate max-w-[240px] mt-1">{videoUrl}</span>
+                    <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/70 backdrop-blur-xs text-[10px] font-bold text-amber-300">
+                      Telegram Video
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-6 text-center text-xs text-slate-500 bg-slate-950 flex flex-col items-center gap-1.5">
+                    <Film className="w-6 h-6 text-amber-400/50" />
+                    <span>কোনো ভিডিও ফাইল বা লিঙ্ক সিলেক্ট করা হয়নি</span>
+                  </div>
+                )
+              ) : thumbnail ? (
                 <div className="relative aspect-video w-full bg-slate-900 overflow-hidden">
                   <img
                     src={thumbnail}

@@ -195,10 +195,18 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
     setStatusNotification(null);
 
     try {
+      const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
+      const tgUserId = tgUser?.id ? String(tgUser.id) : (/^\d+$/.test(String(user.id)) ? String(user.id) : undefined);
+
       const res = await fetch('/api/ad-videos/send-inbox', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ videoId: video.id, userId: user.id }),
+        body: JSON.stringify({
+          videoId: video.id,
+          userId: user.id,
+          telegramUserId: tgUserId,
+          username: tgUser?.username || user.username,
+        }),
       });
       const data = await res.json();
 
@@ -218,7 +226,7 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
 
         setStatusNotification({
           type: 'success',
-          text: data.message || '✅ ফুল ভিডিও চ্যানেলে আপলোড হয়েছে!',
+          text: data.message || '✅ ফুল ভিডিও সফলভাবে পাঠানো হয়েছে!',
         });
 
         if (onUnlockSuccess && !hasNotifiedUnlockRef.current) {
@@ -226,11 +234,11 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
           onUnlockSuccess(video.id);
         }
 
-        // INSTANT REDIRECT: Immediately open the Telegram Channel so user has ZERO wait!
+        // REDIRECT / OPEN: Open the link or chat
         if (data.postUrl) {
           setTimeout(() => {
             openTelegramLinkSafe(data.postUrl);
-          }, 350);
+          }, 400);
         }
       } else {
         setStatusNotification({
@@ -448,13 +456,25 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
               <button
                 type="button"
                 onClick={() => {
-                  const targetUrl = channelPostUrl || 'https://t.me/demovideos24';
+                  const targetUrl = channelPostUrl || 'https://t.me/CholoIncomeKoriBot';
+                  if (targetUrl.includes('CholoIncomeKoriBot') || targetUrl.includes('t.me/c/')) {
+                    try {
+                      if ((window as any).Telegram?.WebApp?.close) {
+                        (window as any).Telegram.WebApp.close();
+                        return;
+                      }
+                    } catch {}
+                  }
                   openTelegramLinkSafe(targetUrl);
                 }}
                 className="w-full py-3.5 px-4 bg-[#007aff] hover:bg-[#0069d9] active:scale-98 rounded-2xl text-white font-black text-sm shadow-xl flex items-center justify-center gap-2 transition-all cursor-pointer animate-pulse"
               >
                 <Play className="w-4 h-4 fill-white" />
-                <span>চ্যানেলে সম্পূর্ণ ফুল ভিডিও দেখুন (Open in Channel)</span>
+                <span>
+                  {channelPostUrl && !channelPostUrl.includes('demovideos24')
+                    ? '🤖 বটের চ্যাটে ভিডিও দেখুন (Open App-এর ওপরে)'
+                    : 'চ্যানেলে সম্পূর্ণ ফুল ভিডিও দেখুন (Open in Channel)'}
+                </span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </button>
             ) : isAdsComplete ? (

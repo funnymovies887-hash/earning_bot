@@ -22,8 +22,15 @@ import {
   Edit3,
   Layers,
   ArrowUpRight,
+  Send,
+  MessageSquare,
+  AlertTriangle,
+  CalendarDays,
+  Sparkles,
+  MousePointer,
+  RefreshCw,
 } from 'lucide-react';
-import { UserProfile, IncomeTask } from '../../types';
+import { UserProfile, IncomeTask, DailyWorkRecord, UserPersonalMessage } from '../../types';
 
 interface AdminUserDetailsModalProps {
   user: UserProfile;
@@ -42,8 +49,90 @@ export const AdminUserDetailsModal: React.FC<AdminUserDetailsModalProps> = ({
   onClose,
   onEditUser,
 }) => {
-  const [activeTab, setActiveTab] = useState<'tasks' | 'withdrawals' | 'referrals' | 'orders'>('tasks');
+  const [activeTab, setActiveTab] = useState<'tasks' | 'weeklyWork' | 'sendMessage' | 'withdrawals' | 'referrals' | 'orders'>('tasks');
   const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  // Direct Warning / Message State
+  const [msgType, setMsgType] = useState<'warning' | 'notice' | 'message' | 'bonus'>('warning');
+  const [msgTitle, setMsgTitle] = useState('');
+  const [msgBody, setMsgBody] = useState('');
+  const [sendTg, setSendTg] = useState(true);
+  const [isSendingMsg, setIsSendingMsg] = useState(false);
+  const [msgFeedback, setMsgFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [personalNotifs, setPersonalNotifs] = useState<UserPersonalMessage[]>(user.personalNotifications || []);
+
+  const handleSendDirectMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!msgBody.trim()) {
+      setMsgFeedback({ type: 'error', text: 'অনুগ্রহ করে মেসেজ বা সতর্কবার্তা লিখুন।' });
+      return;
+    }
+
+    setIsSendingMsg(true);
+    setMsgFeedback(null);
+    try {
+      const res = await fetch('/api/admin/users/send-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          type: msgType,
+          title: msgTitle.trim(),
+          message: msgBody.trim(),
+          sendToTelegram: sendTg,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMsgFeedback({
+          type: 'success',
+          text: data.message || 'মেসেজটি ইউজারের কাছে সফলভাবে পৌঁছে দেওয়া হয়েছে!',
+        });
+        if (data.notification) {
+          setPersonalNotifs((prev) => [data.notification, ...prev]);
+        }
+        setMsgBody('');
+        setMsgTitle('');
+      } else {
+        setMsgFeedback({
+          type: 'error',
+          text: data.error || 'মেসেজ পাঠানো ব্যর্থ হয়েছে।',
+        });
+      }
+    } catch (err: any) {
+      setMsgFeedback({ type: 'error', text: err.message || 'সার্ভার সংযোগ ত্রুটি' });
+    } finally {
+      setIsSendingMsg(false);
+    }
+  };
+
+  // Generate or read rolling 7-day work history
+  const get7DayHistory = (): DailyWorkRecord[] => {
+    if (user.weeklyWorkHistory && Array.isArray(user.weeklyWorkHistory) && user.weeklyWorkHistory.length > 0) {
+      return user.weeklyWorkHistory;
+    }
+    const days: DailyWorkRecord[] = [];
+    const banglaDayNames = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
+    const now = new Date(Date.now() + 6 * 3600 * 1000);
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(now.getTime() - i * 24 * 3600 * 1000);
+      const dateStr = d.toISOString().slice(0, 10);
+      const bDay = banglaDayNames[d.getDay()];
+      const dayLabel = i === 0 ? `আজকে (${bDay})` : i === 1 ? `গতকাল (${bDay})` : `${bDay} (${dateStr.slice(5)})`;
+      days.push({
+        date: dateStr,
+        dayLabel,
+        adsWatched: i === 0 ? (user.adsWatchedToday || 0) : 0,
+        tasksCompleted: i === 0 ? (user.completedTaskIds?.length || 0) : 0,
+        adClicks: 0,
+        earnedUsd: i === 0 ? (Number(user.balanceUsd) || 0) : 0,
+        earnedBdt: i === 0 ? Math.round((Number(user.balanceUsd) || 0) * 120) : 0,
+        referrals: i === 0 ? (user.todayReferrals || 0) : 0,
+      });
+    }
+    return days;
+  };
+  const weeklyHistory = get7DayHistory();
 
   const copyToClipboard = (text: string, fieldName: string) => {
     if (!text) return;
@@ -164,11 +253,18 @@ export const AdminUserDetailsModal: React.FC<AdminUserDetailsModalProps> = ({
 
             <div className="shrink-0 flex sm:flex-col items-center sm:items-end gap-2 w-full sm:w-auto mt-2 sm:mt-0">
               <button
+                onClick={() => setActiveTab('sendMessage')}
+                className="w-full sm:w-auto flex items-center justify-center gap-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold px-3.5 py-2 rounded-xl text-xs transition-all shadow-md shadow-rose-600/30 cursor-pointer"
+              >
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-300" />
+                <span>ওয়ার্নিং / নোটিশ পাঠান</span>
+              </button>
+              <button
                 onClick={() => {
                   onClose();
                   onEditUser(user);
                 }}
-                className="w-full sm:w-auto flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs transition-all shadow-md shadow-amber-500/20 cursor-pointer"
+                className="w-full sm:w-auto flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3.5 py-2 rounded-xl text-xs transition-all shadow-md shadow-amber-500/20 cursor-pointer"
               >
                 <Edit3 className="w-3.5 h-3.5" />
                 <span>ব্যালেন্স এডিট করুন</span>
@@ -242,6 +338,30 @@ export const AdminUserDetailsModal: React.FC<AdminUserDetailsModalProps> = ({
         {/* Tab Navigation */}
         <div className="flex items-center border-b border-slate-800 px-4 sm:px-6 bg-slate-950/40 shrink-0 overflow-x-auto">
           <button
+            onClick={() => setActiveTab('weeklyWork')}
+            className={`flex items-center gap-2 py-3 px-3 text-xs sm:text-sm font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'weeklyWork'
+                ? 'border-emerald-400 text-emerald-400'
+                : 'border-transparent text-slate-400 hover:text-white'
+            }`}
+          >
+            <CalendarDays className="w-4 h-4" />
+            <span>📅 ৭ দিনের কাজের রিপোর্ট (Rolling 7 Days)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('sendMessage')}
+            className={`flex items-center gap-2 py-3 px-3 text-xs sm:text-sm font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'sendMessage'
+                ? 'border-rose-400 text-rose-400'
+                : 'border-transparent text-slate-400 hover:text-white'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4" />
+            <span>📩 নোটিশ / ওয়ার্নিং পাঠান ({personalNotifs.length})</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('tasks')}
             className={`flex items-center gap-2 py-3 px-3 text-xs sm:text-sm font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'tasks'
@@ -250,7 +370,7 @@ export const AdminUserDetailsModal: React.FC<AdminUserDetailsModalProps> = ({
             }`}
           >
             <ListChecks className="w-4 h-4" />
-            <span>সম্পন্ন কাজের রিপোর্ট ({completedTasksDetails.length})</span>
+            <span>সকল সম্পন্ন কাজ ({completedTasksDetails.length})</span>
           </button>
 
           <button
@@ -292,6 +412,369 @@ export const AdminUserDetailsModal: React.FC<AdminUserDetailsModalProps> = ({
 
         {/* Tab Content Body (Scrollable) */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+          {/* TAB: ROLLING 7-DAY WORK HISTORY */}
+          {activeTab === 'weeklyWork' && (
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                <div>
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <CalendarDays className="w-4 h-4 text-emerald-400" />
+                    <span>ব্যবহারকারীর বিগত ৭ দিনের কাজের পুঙ্খানুপুঙ্খ বিবরণ</span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    রোলিং ৭ দিন: দিন পার হওয়ার সাথে সাথে পেছনের ডাটা ক্রমান্বয়ে সরে নতুন দিনের ডাটা স্বয়ংক্রিয়ভাবে সংরক্ষিত হয়।
+                  </p>
+                </div>
+                <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full shrink-0">
+                  সর্বশেষ ৭ দিনের লাইভ রিপোর্ট
+                </span>
+              </div>
+
+              {/* 7-Day Quick Total Stat Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="p-3 bg-slate-950/80 border border-purple-500/20 rounded-xl">
+                  <span className="text-[10px] text-slate-400 block font-medium">৭ দিনের মোট অ্যাড দেখা</span>
+                  <div className="text-base font-black text-purple-300 mt-0.5">
+                    {weeklyHistory.reduce((acc, d) => acc + (d.adsWatched || 0), 0)} টি
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-950/80 border border-emerald-500/20 rounded-xl">
+                  <span className="text-[10px] text-slate-400 block font-medium">৭ দিনের সম্পন্ন টাস্ক</span>
+                  <div className="text-base font-black text-emerald-300 mt-0.5">
+                    {weeklyHistory.reduce((acc, d) => acc + (d.tasksCompleted || 0), 0)} টি
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-950/80 border border-blue-500/20 rounded-xl">
+                  <span className="text-[10px] text-slate-400 block font-medium">৭ দিনের অ্যাড ক্লিক (CTR)</span>
+                  <div className="text-base font-black text-blue-300 mt-0.5">
+                    {weeklyHistory.reduce((acc, d) => acc + (d.adClicks || 0), 0)} টি
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-950/80 border border-amber-500/20 rounded-xl">
+                  <span className="text-[10px] text-slate-400 block font-medium">৭ দিনের মোট আয়</span>
+                  <div className="text-base font-black text-amber-300 mt-0.5">
+                    ৳ {weeklyHistory.reduce((acc, d) => acc + (d.earnedBdt || 0), 0)} <span className="text-[10px] text-amber-400 font-mono">(${weeklyHistory.reduce((acc, d) => acc + (d.earnedUsd || 0), 0).toFixed(3)})</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Day-by-Day Detailed Breakdown (Last 7 Days) */}
+              <div className="space-y-2.5">
+                {weeklyHistory.map((day, idx) => {
+                  const hasActivity = (day.adsWatched || 0) > 0 || (day.tasksCompleted || 0) > 0 || (day.earnedBdt || 0) > 0 || (day.adClicks || 0) > 0;
+                  return (
+                    <div
+                      key={day.date + '-' + idx}
+                      className={`p-3.5 sm:p-4 rounded-2xl border transition-all ${
+                        idx === 0
+                          ? 'bg-slate-950/90 border-emerald-500/40 shadow-md'
+                          : hasActivity
+                          ? 'bg-slate-950/70 border-slate-800 hover:border-slate-700'
+                          : 'bg-slate-950/40 border-slate-900 opacity-75'
+                      }`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${
+                              idx === 0
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                : idx === 1
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                                : 'bg-slate-800 text-slate-300 border border-slate-700'
+                            }`}
+                          >
+                            দিন {idx + 1}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-xs sm:text-sm font-black text-white">{day.dayLabel}</h4>
+                              <span className="text-[10px] font-mono text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                                {day.date}
+                              </span>
+                              {idx === 0 && (
+                                <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                  আজকের দিন
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                                  hasActivity
+                                    ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
+                                    : 'bg-slate-800 text-slate-400'
+                                }`}
+                              >
+                                {hasActivity ? '✅ সক্রিয় কাজ সম্পন্ন' : '💤 কোনো কাজ করেনি'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Day Stats */}
+                        <div className="grid grid-cols-4 gap-2 text-center sm:text-right shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800">
+                          <div className="bg-slate-900/60 p-1.5 sm:p-2 rounded-lg border border-slate-800/80">
+                            <span className="text-[9px] text-slate-400 block">👁️ অ্যাড দেখা</span>
+                            <span className="text-xs font-black text-purple-300">{day.adsWatched || 0} টি</span>
+                          </div>
+
+                          <div className="bg-slate-900/60 p-1.5 sm:p-2 rounded-lg border border-slate-800/80">
+                            <span className="text-[9px] text-slate-400 block">📋 টাস্ক</span>
+                            <span className="text-xs font-black text-emerald-300">{day.tasksCompleted || 0} টি</span>
+                          </div>
+
+                          <div className="bg-slate-900/60 p-1.5 sm:p-2 rounded-lg border border-slate-800/80">
+                            <span className="text-[9px] text-slate-400 block">👆 অ্যাড ক্লিক</span>
+                            <span className="text-xs font-black text-blue-300">{day.adClicks || 0} টি</span>
+                          </div>
+
+                          <div className="bg-slate-900/60 p-1.5 sm:p-2 rounded-lg border border-amber-500/20">
+                            <span className="text-[9px] text-amber-400 block">💰 দৈনিক আয়</span>
+                            <span className="text-xs font-black text-amber-300">৳ {day.earnedBdt || 0}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-xs text-blue-200 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>
+                  💡 <b>অটো-আপডেট:</b> রাত ১২টার পর দিন পরিবর্তন হলে স্বয়ংক্রিয়ভাবে বিগত ৭ দিনের আপডেট হিস্ট্রি এখানে সংরক্ষিত হবে এবং সবচেয়ে পুরনো দিনের ডাটা রোলিং নিয়ম অনুযায়ী সরে যাবে।
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: SEND INDIVIDUAL MESSAGE / WARNING */}
+          {activeTab === 'sendMessage' && (
+            <div className="space-y-4">
+              <div className="border-b border-slate-800 pb-3">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-rose-400" />
+                  <span>ব্যবহারকারীকে সরাসরি সতর্কবার্তা / নোটিশ / মেসেজ পাঠান</span>
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  ইউজারের কোনো কাজের ভুল হলে অথবা নির্দিষ্ট কোনো নোটিশ বা সতর্কবার্তা দিতে চাইলে এখান থেকে পাঠাতে পারেন।
+                </p>
+              </div>
+
+              {msgFeedback && (
+                <div
+                  className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
+                    msgFeedback.type === 'success'
+                      ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-200'
+                      : 'bg-rose-950/80 border-rose-500/50 text-rose-200'
+                  }`}
+                >
+                  {msgFeedback.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> : <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />}
+                  <span>{msgFeedback.text}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSendDirectMessage} className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4">
+                {/* Type Selection */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                    বার্তার ধরণ নির্বাচন করুন (Message / Notice Type):
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { type: 'warning' as const, label: '⚠️ সতর্কবার্তা (Warning)', color: 'border-rose-500 bg-rose-950/40 text-rose-200' },
+                      { type: 'notice' as const, label: '📢 জরুরি নোটিশ (Notice)', color: 'border-amber-500 bg-amber-950/40 text-amber-200' },
+                      { type: 'message' as const, label: '💬 সাধারণ বার্তা (Direct)', color: 'border-blue-500 bg-blue-950/40 text-blue-200' },
+                      { type: 'bonus' as const, label: '🎁 বোনাস / ইনসেনটিভ', color: 'border-emerald-500 bg-emerald-950/40 text-emerald-200' },
+                    ].map((item) => (
+                      <button
+                        key={item.type}
+                        type="button"
+                        onClick={() => {
+                          setMsgType(item.type);
+                          if (!msgTitle) {
+                            if (item.type === 'warning') setMsgTitle('⚠️ কাজের ভুল সংক্রান্ত সতর্কবার্তা');
+                            if (item.type === 'notice') setMsgTitle('📢 অ্যাডমিন জরুরি নোটিশ');
+                            if (item.type === 'message') setMsgTitle('💬 আপনার অ্যাকাউন্ট সম্পর্কে বার্তা');
+                            if (item.type === 'bonus') setMsgTitle('🎁 অভিনন্দন! বিশেষ বোনাস রিওয়ার্ড');
+                          }
+                        }}
+                        className={`p-2.5 rounded-xl border text-xs font-bold transition-all text-left ${
+                          msgType === item.type
+                            ? `${item.color} shadow-md ring-1 ring-white/20`
+                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Quick One-Click Template Chips */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 mb-1.5 flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>এক-ক্লিকে টেমপ্লেট বসান:</span>
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      {
+                        title: '⚠️ কাজে ভুল: টাইমার শেষ না করে ব্যাক করেছেন',
+                        body: 'প্রিয় সদস্য, আপনার কাজের পর্যালোচনায় দেখা গেছে আপনি বিজ্ঞাপনের পুরো সময় অপেক্ষা না করেই ব্যাক করেছেন। অনুগ্রহ করে সম্পূর্ণ নির্ধারিত সময় অপেক্ষা করুন, অন্যথায় ব্যালেন্স কাটা হতে পারে।',
+                        type: 'warning' as const,
+                      },
+                      {
+                        title: '⚠️ নোটিশ: বিজ্ঞাপনে ক্লিক ভেরিফিকেশন সম্পন্ন করুন',
+                        body: 'বিজ্ঞাপন দেখার সময় লিংকে অবশ্যই একবার ক্লিক করে ভিজিট নিশ্চিত করতে হবে। ক্লিক ছাড়া রিওয়ার্ড গ্রহণ করা যাবে না। নিয়ম মেনে কাজ করুন।',
+                        type: 'warning' as const,
+                      },
+                      {
+                        title: '⚠️ জরুরি ওয়ার্নিং: ভিপিএন বা অবৈধ ক্লিক শনাক্ত',
+                        body: 'আপনার অ্যাকাউন্টে অস্বাভাবিক ক্লিক বা ভিপিএন সংযোগ শনাক্ত হয়েছে। অবিলম্বে ভিপিএন ছাড়া স্বাভাবিক ইন্টারনেট ব্যবহার করে কাজ করুন, অন্যথায় অ্যাকাউন্ট ব্যান হবে।',
+                        type: 'warning' as const,
+                      },
+                      {
+                        title: '📢 নোটিশ: আপনার উইথড্র পেমেন্ট সফলভাবে পাঠানো হয়েছে',
+                        body: 'অভিনন্দন! আপনার সর্বশেষ উইথড্র রিকোয়েস্ট সফলভাবে প্রসেস করা হয়েছে। নিয়মিত কাজ করুন এবং বন্ধুদের রেফার করে আনলিমিটেড ইনকাম করুন।',
+                        type: 'notice' as const,
+                      },
+                      {
+                        title: '🎁 বোনাস: দারুণ কাজের জন্য বিশেষ বোনাস রিওয়ার্ড',
+                        body: 'আপনার দুর্দান্ত কাজের পারফরম্যান্সের জন্য আপনাকে ধন্যবাদ! নিয়ম মেনে কাজ চালিয়ে যান।',
+                        type: 'bonus' as const,
+                      },
+                    ].map((tpl, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => {
+                          setMsgType(tpl.type);
+                          setMsgTitle(tpl.title);
+                          setMsgBody(tpl.body);
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-[10px] font-semibold text-slate-300 hover:text-white transition-all text-left truncate max-w-[280px]"
+                        title={tpl.title}
+                      >
+                        {tpl.title}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Title */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    বার্তার বিষয় / টাইটেল (Title):
+                  </label>
+                  <input
+                    type="text"
+                    value={msgTitle}
+                    onChange={(e) => setMsgTitle(e.target.value)}
+                    placeholder="যেমন: ⚠️ কাজের ভুল সংক্রান্ত সতর্কবার্তা"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 font-bold"
+                  />
+                </div>
+
+                {/* Message Body */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    বার্তা বা সতর্কবার্তার বিবরণ (Message Body) *:
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={msgBody}
+                    onChange={(e) => setMsgBody(e.target.value)}
+                    placeholder="ব্যবহারকারীকে কী জানাতে চান বিস্তারিত লিখুন..."
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-rose-500 leading-relaxed font-sans resize-y"
+                    required
+                  />
+                </div>
+
+                {/* Delivery Target Options */}
+                <div className="p-3 bg-slate-900/80 border border-slate-800 rounded-xl flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="sendToTelegramCheck"
+                      checked={sendTg}
+                      onChange={(e) => setSendTg(e.target.checked)}
+                      className="w-4 h-4 rounded text-rose-500 focus:ring-rose-500 bg-slate-950 border-slate-700 cursor-pointer"
+                    />
+                    <label htmlFor="sendToTelegramCheck" className="text-xs font-bold text-slate-200 cursor-pointer">
+                      🤖 @CholoIncomeKoriBot দিয়ে সরাসরি ইউজারের টেলিগ্রামে ইনবক্স মেসেজ পাঠান
+                    </label>
+                  </div>
+                  <span className="text-[10px] text-amber-400 font-medium">ইন-অ্যাপ নোটিশ সবসময় থাকবে</span>
+                </div>
+
+                {/* Submit button */}
+                <button
+                  type="submit"
+                  disabled={isSendingMsg}
+                  className="w-full py-3 px-5 rounded-xl bg-gradient-to-r from-rose-600 via-pink-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-black text-xs transition-all shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2 active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+                >
+                  {isSendingMsg ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>মেসেজ পাঠানো হচ্ছে...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      <span>📩 ইউজারকে সরাসরি বার্তা / সতর্কবার্তা পাঠান (Send Message)</span>
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* History of Sent Messages */}
+              {personalNotifs.length > 0 && (
+                <div className="space-y-2 pt-2">
+                  <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1.5 px-1">
+                    <Clock className="w-3.5 h-3.5 text-slate-400" />
+                    <span>এই ব্যবহারকারীকে পূর্বে পাঠানো বার্তার ইতিহাস ({personalNotifs.length}টি)</span>
+                  </h4>
+
+                  <div className="space-y-2">
+                    {personalNotifs.map((n) => (
+                      <div
+                        key={n.id}
+                        className={`p-3 rounded-xl border text-xs ${
+                          n.type === 'warning'
+                            ? 'bg-rose-950/30 border-rose-500/30'
+                            : n.type === 'bonus'
+                            ? 'bg-emerald-950/30 border-emerald-500/30'
+                            : 'bg-slate-950 border-slate-800'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-bold text-white flex items-center gap-1.5">
+                            {n.type === 'warning' ? '⚠️' : n.type === 'bonus' ? '🎁' : '📢'} {n.title}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {n.createdAt ? new Date(n.createdAt).toLocaleString('bn-BD') : 'Recent'}
+                          </span>
+                        </div>
+                        <p className="text-slate-300 text-[11px] leading-relaxed whitespace-pre-line">{n.message}</p>
+                        <div className="mt-2 flex items-center justify-between text-[10px] text-slate-500 border-t border-slate-800/60 pt-1">
+                          <span>প্রেরক: {n.sentBy || 'Admin'}</span>
+                          <span className={n.isRead ? 'text-emerald-400 font-bold' : 'text-amber-400'}>
+                            {n.isRead ? '✅ ইউজার পড়েছে' : '⏳ এখনও পড়েনি'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* TAB 1: COMPLETED TASKS */}
           {activeTab === 'tasks' && (
             <div className="space-y-3">

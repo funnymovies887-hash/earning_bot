@@ -350,8 +350,20 @@ interface ScheduledVideoDeletion {
   botToken?: string;
   status: 'pending' | 'deleted' | 'failed';
   error?: string;
+  retryCount?: number;
 }
 let scheduledDeletions: ScheduledVideoDeletion[] = loadJsonFile("scheduled_deletions.json", []);
+
+interface UserPersonalMessage {
+  id: string;
+  type: 'warning' | 'notice' | 'message' | 'bonus';
+  title: string;
+  message: string;
+  createdAt: string;
+  isRead: boolean;
+  sentBy?: string;
+  sentToTelegram?: boolean;
+}
 
 function escapeTgHtml(text: string): string {
   if (!text) return "";
@@ -359,6 +371,77 @@ function escapeTgHtml(text: string): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
+}
+
+function getDayNameBangla(dateStr: string): string {
+  const days = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    return days[d.getDay()] || '';
+  }
+  return '';
+}
+
+function ensureRolling7DaysHistory(user: any): any[] {
+  if (!user) return [];
+  if (!Array.isArray(user.weeklyWorkHistory)) {
+    user.weeklyWorkHistory = [];
+  }
+
+  const today = new Date(Date.now() + 6 * 3600 * 1000);
+  const result: any[] = [];
+
+  for (let i = 0; i < 7; i++) {
+    const targetDate = new Date(today.getTime() - i * 24 * 3600 * 1000);
+    const dateStr = targetDate.toISOString().slice(0, 10);
+    const dayName = getDayNameBangla(dateStr);
+    const dayLabel = i === 0 ? `আজকে (${dayName})` : i === 1 ? `গতকাল (${dayName})` : `${dayName} (${dateStr.slice(5)})`;
+
+    let existing = user.weeklyWorkHistory.find((r: any) => r.date === dateStr);
+    if (!existing) {
+      existing = {
+        date: dateStr,
+        dayLabel,
+        adsWatched: i === 0 ? (user.adsWatchedToday || 0) : 0,
+        tasksCompleted: 0,
+        adClicks: 0,
+        earnedUsd: 0,
+        earnedBdt: 0,
+        referrals: i === 0 ? (user.todayReferrals || 0) : 0,
+      };
+    } else {
+      existing.dayLabel = dayLabel;
+    }
+    result.push(existing);
+  }
+
+  user.weeklyWorkHistory = result;
+  return result;
+}
+
+function recordUserDailyWork(
+  user: any,
+  update: {
+    adsWatched?: number;
+    tasksCompleted?: number;
+    adClicks?: number;
+    earnedUsd?: number;
+    referrals?: number;
+  }
+) {
+  if (!user) return;
+  const history = ensureRolling7DaysHistory(user);
+  const todayRecord = history[0];
+
+  if (update.adsWatched) todayRecord.adsWatched = (todayRecord.adsWatched || 0) + update.adsWatched;
+  if (update.tasksCompleted) todayRecord.tasksCompleted = (todayRecord.tasksCompleted || 0) + update.tasksCompleted;
+  if (update.adClicks) todayRecord.adClicks = (todayRecord.adClicks || 0) + update.adClicks;
+  if (update.earnedUsd) {
+    todayRecord.earnedUsd = +(Number(todayRecord.earnedUsd || 0) + update.earnedUsd).toFixed(4);
+    todayRecord.earnedBdt = Math.round(todayRecord.earnedUsd * 120);
+  }
+  if (update.referrals) todayRecord.referrals = (todayRecord.referrals || 0) + update.referrals;
 }
 
 function formatTelegramChatTarget(chatInput: string): string {
@@ -460,8 +543,19 @@ async function cleanupExpiredTelegramVideos() {
           console.warn("[AutoDelete] Follow-up notification error:", msgErr.message);
         }
       } else {
-        item.status = 'failed';
-        item.error = delResult.error;
+        const isTerminalError =
+          delResult.error?.includes("message to delete not found") ||
+          delResult.error?.includes("chat not found") ||
+          (item.retryCount && item.retryCount >= 6);
+
+        if (isTerminalError) {
+          item.status = 'deleted';
+          item.error = delResult.error;
+        } else {
+          item.status = 'failed';
+          item.error = delResult.error;
+          item.retryCount = (item.retryCount || 0) + 1;
+        }
         modified = true;
       }
     }
@@ -473,6 +567,13 @@ async function cleanupExpiredTelegramVideos() {
   if (filtered.length !== scheduledDeletions.length || modified) {
     scheduledDeletions = filtered;
     saveJsonFile("scheduled_deletions.json", scheduledDeletions);
+    if (githubSyncConfig.token) {
+      pushFileToGitHubDirect(
+        "data/scheduled_deletions.json",
+        JSON.stringify(scheduledDeletions, null, 2),
+        "Auto-update scheduled deletions status"
+      ).catch(() => {});
+    }
   }
 }
 
@@ -687,6 +788,7 @@ async function pushAllDataToGitHub(): Promise<{ success: boolean; message: strin
     { path: "data/users.json", content: JSON.stringify(usersMap, null, 2), desc: `ইউজার তালিকা (${Object.keys(usersMap).length} জন)` },
     { path: "data/orders.json", content: JSON.stringify(serverOrders, null, 2), desc: `স্টোর অর্ডার (${serverOrders.length}টি)` },
     { path: "data/withdrawals.json", content: JSON.stringify(withdrawals, null, 2), desc: `উইথড্র তালিকা (${withdrawals.length}টি)` },
+    { path: "data/scheduled_deletions.json", content: JSON.stringify(scheduledDeletions, null, 2), desc: "৯০ মিনিটের ভিডিও অটো-ডিলিট কিউ" },
   ];
 
   const results = [];
@@ -825,6 +927,21 @@ async function pullAllDataFromGitHub(): Promise<{ success: boolean; message: str
         if (Array.isArray(data)) {
           serverAdLockedVideos = data;
           saveJsonFile("ad_videos.json", serverAdLockedVideos);
+        }
+      },
+    },
+    {
+      path: "data/scheduled_deletions.json",
+      name: "scheduledDeletions",
+      apply: (data) => {
+        if (Array.isArray(data)) {
+          const existingIds = new Set(scheduledDeletions.map((s) => s.id));
+          for (const item of data) {
+            if (item && item.id && !existingIds.has(item.id)) {
+              scheduledDeletions.push(item);
+            }
+          }
+          saveJsonFile("scheduled_deletions.json", scheduledDeletions);
         }
       },
     },
@@ -1095,14 +1212,32 @@ async function startServer() {
       });
     }
 
+    const earned = rewardUsd || 0.0125;
     if (!user.completedTaskIds) user.completedTaskIds = [];
     if (!user.completedTaskIds.includes(taskId)) {
       user.completedTaskIds.push(taskId);
-      user.balanceUsd = +(Number(user.balanceUsd || 0) + (rewardUsd || 0.0125)).toFixed(4);
+      user.balanceUsd = +(Number(user.balanceUsd || 0) + earned).toFixed(4);
       user.adsWatchedToday = (user.adsWatchedToday || 0) + 1;
     }
+
+    // Record into rolling 7-day work history
+    recordUserDailyWork(user, {
+      adsWatched: type === 'ad' ? 1 : 0,
+      tasksCompleted: 1,
+      earnedUsd: earned,
+    });
+
     saveJsonFile("users.json", usersMap);
     res.json({ success: true, user });
+  });
+
+  // Record Ad Click (Increases CTR & registers into 7-day activity)
+  app.post("/api/user/record-click", (req, res) => {
+    const user = getRequestUser(req);
+    const { taskId, adType } = req.body || {};
+    recordUserDailyWork(user, { adClicks: 1 });
+    saveJsonFile("users.json", usersMap);
+    res.json({ success: true, message: "অ্যাড ক্লিক সফলভাবে নথিভুক্ত হয়েছে!" });
   });
 
   // Claim Tier Reward
@@ -1875,7 +2010,10 @@ async function startServer() {
 
   // Admin API: Stats & Overview
   app.get("/api/admin/stats", (_req, res) => {
-    const userList = Object.values(usersMap);
+    const userList = Object.values(usersMap).map((u: any) => {
+      ensureRolling7DaysHistory(u);
+      return u;
+    });
     const totalPaid = withdrawals
       .filter((w) => w.status === "Approved")
       .reduce((sum, item) => sum + item.amount, 0);
@@ -1946,6 +2084,112 @@ async function startServer() {
       return res.json({ success: true, user: targetUser });
     }
     return res.status(404).json({ error: "User not found" });
+  });
+
+  // Admin API: Send individual Personal Message / Warning / Notice to a specific User
+  app.post("/api/admin/users/send-message", async (req, res) => {
+    const { userId, type = 'warning', title, message, sendToTelegram = true } = req.body;
+    const user = usersMap[userId];
+    if (!user) return res.status(404).json({ error: "ইউজার খুঁজে পাওয়া যায়নি।" });
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: "অনুগ্রহ করে একটি বার্তা (Message) লিখুন।" });
+    }
+
+    const notification: UserPersonalMessage = {
+      id: "msg_" + Date.now(),
+      type: type || 'warning',
+      title: title ? title.trim() : (type === 'warning' ? '⚠️ সতর্কবার্তা (Warning Notice)' : '📢 অ্যাডমিন বার্তা'),
+      message: message.trim(),
+      createdAt: new Date().toISOString(),
+      isRead: false,
+      sentBy: 'Admin',
+      sentToTelegram: Boolean(sendToTelegram),
+    };
+
+    if (!Array.isArray(user.personalNotifications)) {
+      user.personalNotifications = [];
+    }
+    user.personalNotifications.unshift(notification);
+    user.personalNotifications = user.personalNotifications.slice(0, 20); // Keep last 20 messages
+    saveJsonFile("users.json", usersMap);
+
+    let telegramSent = false;
+    let tgError = "";
+
+    const token = telegramConfig.botToken || process.env.TELEGRAM_BOT_TOKEN;
+    if (sendToTelegram && token && /^\d+$/.test(userId)) {
+      try {
+        const typeIcons: Record<string, string> = {
+          warning: '⚠️',
+          notice: '📢',
+          message: '💬',
+          bonus: '🎁',
+        };
+        const icon = typeIcons[type] || '⚠️';
+        const tgText = `${icon} <b>Cholo Income Kori — অ্যাডমিন বার্তা</b>\n\n` +
+          `👤 <b>ব্যবহারকারী:</b> ${escapeTgHtml(user.displayName || user.username || userId)}\n` +
+          `📌 <b>বিষয়:</b> <i>${escapeTgHtml(notification.title)}</i>\n\n` +
+          `📝 <b>বার্তা:</b>\n${escapeTgHtml(message.trim())}\n\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `⚠️ <i>অনুগ্রহ করে নিয়ম মেনে অ্যাপে কাজ করুন এবং নিজের অ্যাকাউন্টটি সুরক্ষিত রাখুন।</i>`;
+
+        const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: userId,
+            text: tgText,
+            parse_mode: "HTML",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "🚀 মিনি অ্যাপ ওপেন করুন", url: `https://t.me/${(telegramConfig.botUsername || "CholoIncomeKoriBot").replace("@", "")}` }],
+              ],
+            },
+          }),
+        });
+        const tgData: any = await tgRes.json();
+        if (tgData.ok) {
+          telegramSent = true;
+          console.log(`[AdminUserMsg] Sent personal Telegram message to user ${userId}`);
+        } else {
+          tgError = tgData.description || "Telegram API rejected send";
+          console.warn(`[AdminUserMsg] Telegram error sending to ${userId}:`, tgError);
+        }
+      } catch (e: any) {
+        tgError = e.message;
+        console.warn(`[AdminUserMsg] Telegram exception for ${userId}:`, e.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      notification,
+      telegramSent,
+      tgError,
+      message: telegramSent
+        ? `✅ বার্তাটি ইউজারের অ্যাকাউন্টে সংরক্ষিত হয়েছে এবং @CholoIncomeKoriBot থেকে সরাসরি ইউজারের টেলিগ্রামে পাঠানো হয়েছে!`
+        : `✅ বার্তাটি ইউজারের অ্যাকাউন্টে সংরক্ষিত হয়েছে! (ইউজার মিনি অ্যাপে ঢুকলেই নোটিশ পপআপ দেখতে পাবেন)`,
+    });
+  });
+
+  // User: Mark personal notifications as read
+  app.post("/api/user/notifications/mark-read", (req, res) => {
+    const user = getRequestUser(req);
+    const { notificationId } = req.body || {};
+    if (Array.isArray(user.personalNotifications)) {
+      if (notificationId) {
+        user.personalNotifications.forEach((n) => {
+          if (n.id === notificationId) n.isRead = true;
+        });
+      } else {
+        user.personalNotifications.forEach((n) => {
+          n.isRead = true;
+        });
+      }
+      saveJsonFile("users.json", usersMap);
+    }
+    res.json({ success: true, notifications: user.personalNotifications || [] });
   });
 
   // Admin API: Add video task
@@ -2380,15 +2624,47 @@ async function startServer() {
       return res.status(400).json({ error: "⚠️ কোনো Telegram Bot Token সেট করা নেই। এডমিন প্যানেলে বট টোকেন সেভ করুন।" });
     }
 
-    // Target Channel: user specified channel or default @demovideos24
-    const targetChat = formatTelegramChatTarget(video.channelId || "@demovideos24");
+    const botUsername = (telegramConfig.botUsername || "CholoIncomeKoriBot").replace("@", "");
 
-    const caption = `🎬 **${video.title}** (সম্পূর্ণ ফুল ভিডিও)\n\n⏱️ **এই ভিডিওটি আগামী ৯০ মিনিটের জন্য চ্যানেলে থাকবে এবং ৯০ মিনিট পর স্বয়ংক্রিয়ভাবে মুছে যাবে!**\n\n🛡️ *ডাউনলোড ও ফরওয়ার্ডিং নিষিদ্ধ (Protected Content)*`;
+    // Determine target chat:
+    // If video.channelId is a bot (e.g. "@CholoIncomeKoriBot") or empty,
+    // OR if user requested direct bot inbox delivery, send straight to the user's Telegram chat with @CholoIncomeKoriBot (userId)!
+    const userTgId = (req.body.telegramUserId && /^\d+$/.test(String(req.body.telegramUserId)))
+      ? String(req.body.telegramUserId)
+      : (userId && /^\d+$/.test(String(userId)))
+        ? String(userId)
+        : (user?.id && /^\d+$/.test(String(user.id)))
+          ? String(user.id)
+          : null;
+
+    const rawConfigChat = (video.channelId || "").trim();
+    const isBotDestination =
+      !rawConfigChat ||
+      rawConfigChat.toLowerCase().includes("choloincomekori") ||
+      rawConfigChat.toLowerCase().includes("bot") ||
+      rawConfigChat === "@CholoIncomeKoriBot";
+
+    let targetChat: string;
+    let isDirectUser = false;
+
+    if (isBotDestination && userTgId) {
+      targetChat = userTgId;
+      isDirectUser = true;
+    } else if (rawConfigChat && (rawConfigChat.startsWith("@") || rawConfigChat.startsWith("-"))) {
+      targetChat = formatTelegramChatTarget(rawConfigChat);
+    } else if (userTgId) {
+      targetChat = userTgId;
+      isDirectUser = true;
+    } else {
+      targetChat = formatTelegramChatTarget(rawConfigChat || "@demovideos24");
+    }
+
+    const caption = `🎬 **${video.title}** (সম্পূর্ণ ফুল ভিডিও)\n\n⏱️ **এই ভিডিওটি আগামী ৯০ মিনিটের জন্য অ্যাক্টিভ থাকবে এবং ঠিক ৯০ মিনিট পর স্বয়ংক্রিয়ভাবে চিরতরে ডিলিট হয়ে যাবে!**\n\n🛡️ *ডাউনলোড ও ফরওয়ার্ডিং সম্পূর্ণ নিষিদ্ধ (Protected Content)*`;
 
     let uploadedMsgId: number | null = null;
     let tgErrorMsg = "";
 
-    // 1. Try copyMessage if fullVideoUrl is a Telegram post (e.g. https://t.me/premiumvideounlocked/3)
+    // 1. Try copyMessage if fullVideoUrl is a Telegram post (e.g. https://t.me/premiumvideounlocked/6)
     const tgMatch = video.fullVideoUrl?.match(/t\.me\/(?:c\/)?([^\/\?#]+)\/(\d+)/);
 
     if (tgMatch) {
@@ -2401,14 +2677,14 @@ async function startServer() {
         const copyRes = await fetch(`https://api.telegram.org/bot${botToken}/copyMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          signal: AbortSignal.timeout(3500),
+          signal: AbortSignal.timeout(5000),
           body: JSON.stringify({
             chat_id: targetChat,
             from_chat_id: fromChat,
             message_id: sourceMsgId,
             caption,
             parse_mode: "Markdown",
-            protect_content: true, // Telegram native DRM: disables download, saving, and forwarding!
+            protect_content: true, // Telegram DRM: prevents save, download, and forward!
           }),
         });
 
@@ -2426,14 +2702,14 @@ async function startServer() {
       }
     }
 
-    // 2. Direct Video Send fallback if not copied and is a video url
+    // 2. Direct Video Send fallback if not copied and is a direct video url
     if (!uploadedMsgId && video.fullVideoUrl && !video.fullVideoUrl.includes("drive.google") && !video.fullVideoUrl.includes("youtube")) {
       try {
         console.log(`[SendInbox] sendVideo to ${targetChat} with protect_content: true`);
         const vidRes = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          signal: AbortSignal.timeout(3500),
+          signal: AbortSignal.timeout(5000),
           body: JSON.stringify({
             chat_id: targetChat,
             video: video.fullVideoUrl,
@@ -2460,7 +2736,7 @@ async function startServer() {
         const msgRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          signal: AbortSignal.timeout(3500),
+          signal: AbortSignal.timeout(5000),
           body: JSON.stringify({
             chat_id: targetChat,
             text: `${caption}\n\n🔗 ফুল ভিডিও লিংক: ${video.fullVideoUrl}`,
@@ -2481,18 +2757,19 @@ async function startServer() {
 
     if (!uploadedMsgId) {
       return res.status(500).json({
-        error: `চ্যানেলে ভিডিও পোস্ট পাঠাতে টেলিগ্রাম ত্রুটি: ${tgErrorMsg || "বটকে চ্যানেলে এডমিন করা আছে কিনা যাচাই করুন।"}`,
+        error: `ভিডিও পাঠাতে টেলিগ্রাম সার্ভার ত্রুটি: ${tgErrorMsg || "বটকে চ্যানেলে এডমিন করা আছে কিনা অথবা বটের সাথে চ্যাট স্টার্ট করা আছে কিনা যাচাই করুন।"}`,
       });
     }
 
     const expiryMs = (video.expiryMinutes || 90) * 60 * 1000;
     const deleteAt = now + expiryMs;
-    const cleanTarget = targetChat.replace("@", "");
-    const postUrl = targetChat.startsWith("@")
-      ? `https://t.me/${cleanTarget}/${uploadedMsgId}`
-      : `https://t.me/${cleanTarget}`;
+    const postUrl = isDirectUser
+      ? `https://t.me/${botUsername}`
+      : targetChat.startsWith("@")
+        ? `https://t.me/${targetChat.replace("@", "")}/${uploadedMsgId}`
+        : `https://t.me/demovideos24`;
 
-    // Schedule auto-deletion in 90 minutes
+    // Schedule 100% airtight auto-deletion in 90 minutes
     const schedItem: ScheduledVideoDeletion = {
       id: "del_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7),
       chatId: targetChat,
@@ -2506,6 +2783,13 @@ async function startServer() {
     };
     scheduledDeletions.unshift(schedItem);
     saveJsonFile("scheduled_deletions.json", scheduledDeletions);
+    if (githubSyncConfig.token) {
+      pushFileToGitHubDirect(
+        "data/scheduled_deletions.json",
+        JSON.stringify(scheduledDeletions, null, 2),
+        `Auto-schedule 90m deletion for video #${uploadedMsgId} in ${targetChat}`
+      ).catch(() => {});
+    }
 
     // Update Session
     session.unlocked = true;
@@ -2523,12 +2807,18 @@ async function startServer() {
     return res.json({
       success: true,
       delivered: true,
+      isDirectUser,
       postUrl,
       channelId: targetChat,
       messageId: uploadedMsgId,
       expiresAt: deleteAt,
       remainingSeconds: Math.floor(expiryMs / 1000),
-      message: `🎉 অভিনন্দন! সম্পূর্ণ ফুল ভিডিওটি সফলভাবে ${targetChat} চ্যানেলে আপলোড হয়েছে! আগামী ৯০ মিনিট পর এটি স্বয়ংক্রিয়ভাবে মুছে যাবে এবং এটি ডাউনলোড বা ফরওয়ার্ড করা যাবে না।`,
+      fullVideoUrl: video.fullVideoUrl,
+      previewVideoUrl: video.previewVideoUrl,
+      title: video.title,
+      message: isDirectUser
+        ? `🎉 অভিনন্দন! সম্পূর্ণ ফুল ভিডিওটি @${botUsername} বটের মাধ্যমে আপনার ইনবক্সে পাঠানো হয়েছে এবং ৯০ মিনিটের জন্য আনলক হয়েছে! ঠিক ৯০ মিনিট পর এটি স্বয়ংক্রিয়ভাবে ডিলিট হয়ে যাবে।`
+        : `🎉 অভিনন্দন! সম্পূর্ণ ফুল ভিডিওটি সফলভাবে ${targetChat} চ্যানেলে আপলোড হয়েছে! আগামী ৯০ মিনিট পর এটি স্বয়ংক্রিয়ভাবে মুছে যাবে।`,
     });
   });
 
@@ -2540,6 +2830,17 @@ async function startServer() {
       vid.views = (vid.views || 0) + 1;
     }
     res.json({ success: true });
+  });
+
+  // Verification endpoint for 90-minute auto-deletion
+  app.all("/api/ad-videos/check-deletions", async (_req, res) => {
+    await cleanupExpiredTelegramVideos();
+    res.json({
+      success: true,
+      totalQueued: scheduledDeletions.length,
+      pending: scheduledDeletions.filter((s) => s.status === 'pending').length,
+      deleted: scheduledDeletions.filter((s) => s.status === 'deleted').length,
+    });
   });
 
   // Admin: Post Demo Video to Channel with 'Watch Full Video' inline button
@@ -2709,11 +3010,15 @@ async function startServer() {
     res.json({ success: true, posts: serverChannelPosts });
   });
 
-  // Admin: Publish new post to Telegram channel with 3 inline buttons
+  // Admin: Publish new post to Telegram channel with 3 inline buttons (supports both Photo & Video)
   app.post("/api/admin/channel-publisher/publish", async (req, res) => {
     const {
       targetChannel = "@demovideos24",
+      mediaType = "image", // 'image' | 'video'
       thumbnail,
+      videoUrl,
+      videoBase64,
+      videoFileName,
       title,
       description,
       demoUrl,
@@ -2764,6 +3069,9 @@ async function startServer() {
       rawTarget.toLowerCase() === "bot_chat" ||
       rawTarget.toLowerCase() === "bot_users";
 
+    const cleanVideoUrl = (videoUrl || "").trim();
+    const cleanThumbnail = (thumbnail || "").trim();
+
     // If broadcasting directly to Bot Chat (all users who started @CholoIncomeKoriBot)
     if (isBotBroadcast) {
       const userIds = Object.keys(usersMap).filter((id) => /^\d+$/.test(id));
@@ -2775,13 +3083,26 @@ async function startServer() {
       for (const uid of userIds) {
         try {
           let sendRes;
-          if (thumbnail && thumbnail.trim()) {
+          if (mediaType === "video" && cleanVideoUrl) {
+            sendRes = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                chat_id: uid,
+                video: cleanVideoUrl,
+                caption,
+                parse_mode: "HTML",
+                reply_markup: inlineKeyboard,
+                supports_streaming: true,
+              }),
+            });
+          } else if (cleanThumbnail) {
             sendRes = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 chat_id: uid,
-                photo: thumbnail.trim(),
+                photo: cleanThumbnail,
                 caption,
                 parse_mode: "HTML",
                 reply_markup: inlineKeyboard,
@@ -2814,7 +3135,9 @@ async function startServer() {
         targetChannel: "@CholoIncomeKoriBot (ইউজার চ্যাটবক্স)",
         title: cleanTitle,
         description: cleanDesc,
-        thumbnail: thumbnail || "",
+        mediaType: mediaType || (cleanVideoUrl ? "video" : "image"),
+        thumbnail: cleanThumbnail,
+        videoUrl: cleanVideoUrl,
         demoUrl: validDemoUrl,
         fullVideoUrl: validFullUrl,
         tutorialUrl: validTutUrl,
@@ -2843,16 +3166,79 @@ async function startServer() {
     let publishedMsgId: number | null = null;
     let tgErrorMsg = "";
 
-    // 1. Try sending Photo if thumbnail provided
-    if (thumbnail && thumbnail.trim()) {
+    // 1a. If mediaType is 'video' and admin uploaded a video file directly (base64)
+    if (mediaType === "video" && videoBase64) {
+      try {
+        const matches = videoBase64.match(/^data:([A-Za-z0-9\/+-]+);base64,(.+)$/);
+        const buffer = matches ? Buffer.from(matches[2], "base64") : Buffer.from(videoBase64, "base64");
+        const mime = matches ? matches[1] : "video/mp4";
+        const form = new FormData();
+        form.append("chat_id", targetChat);
+        form.append("video", new Blob([buffer], { type: mime }), videoFileName || "video.mp4");
+        form.append("caption", caption);
+        form.append("parse_mode", "HTML");
+        form.append("reply_markup", JSON.stringify(inlineKeyboard));
+        form.append("supports_streaming", "true");
+
+        console.log(`[ChannelPublisher] Uploading video file (${buffer.length} bytes) to ${targetChat}`);
+        const vidRes = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, {
+          method: "POST",
+          body: form,
+        });
+        const vidData: any = await vidRes.json();
+        if (vidData.ok && vidData.result?.message_id) {
+          publishedMsgId = vidData.result.message_id;
+        } else {
+          tgErrorMsg = vidData.description || "Video file upload failed";
+          console.warn("[ChannelPublisher] Upload sendVideo error:", tgErrorMsg);
+        }
+      } catch (err: any) {
+        tgErrorMsg = err.message;
+        console.warn("[ChannelPublisher] Upload sendVideo exception:", err.message);
+      }
+    }
+
+    // 1b. If mediaType is 'video' and videoUrl provided: Send Video directly!
+    if (!publishedMsgId && mediaType === "video" && cleanVideoUrl) {
+      try {
+        console.log(`[ChannelPublisher] Sending video to ${targetChat} with 3 inline buttons`);
+        const vidRes = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(10000),
+          body: JSON.stringify({
+            chat_id: targetChat,
+            video: cleanVideoUrl,
+            caption,
+            parse_mode: "HTML",
+            reply_markup: inlineKeyboard,
+            supports_streaming: true,
+          }),
+        });
+        const vidData: any = await vidRes.json();
+        if (vidData.ok && vidData.result?.message_id) {
+          publishedMsgId = vidData.result.message_id;
+        } else {
+          tgErrorMsg = vidData.description || "Video send failed";
+          console.warn("[ChannelPublisher] sendVideo error:", tgErrorMsg);
+        }
+      } catch (err: any) {
+        tgErrorMsg = err.message;
+        console.warn("[ChannelPublisher] sendVideo exception:", err.message);
+      }
+    }
+
+    // 2. Try sending Photo if media is image or video send failed
+    if (!publishedMsgId && cleanThumbnail) {
       try {
         console.log(`[ChannelPublisher] Sending photo to ${targetChat} with 3 inline buttons`);
         const photoRes = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(6000),
           body: JSON.stringify({
             chat_id: targetChat,
-            photo: thumbnail.trim(),
+            photo: cleanThumbnail,
             caption,
             parse_mode: "HTML",
             reply_markup: inlineKeyboard,
@@ -2871,13 +3257,14 @@ async function startServer() {
       }
     }
 
-    // 2. Fallback to sendMessage if photo not provided or failed
+    // 3. Fallback to sendMessage if photo/video not provided or failed
     if (!publishedMsgId) {
       try {
         console.log(`[ChannelPublisher] Sending text message fallback to ${targetChat}`);
         const msgRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(6000),
           body: JSON.stringify({
             chat_id: targetChat,
             text: caption,
@@ -2912,7 +3299,9 @@ async function startServer() {
       targetChannel: targetChat,
       title: cleanTitle,
       description: cleanDesc,
-      thumbnail: thumbnail || "",
+      mediaType: mediaType || (cleanVideoUrl ? "video" : "image"),
+      thumbnail: cleanThumbnail,
+      videoUrl: cleanVideoUrl,
       demoUrl: validDemoUrl,
       fullVideoUrl: validFullUrl,
       tutorialUrl: validTutUrl,
