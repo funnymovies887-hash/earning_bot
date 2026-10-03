@@ -25,7 +25,79 @@
     "claimableCommissionUsd": 0,
     "referralCommissionHistory": [],
     "createdAt": "2026-09-12T16:11:43.901Z",
-    "balanceBdt": 0
+    "balanceBdt": 0,
+    "weeklyWorkHistory": [
+      {
+        "date": "2026-10-03",
+        "dayLabel": "আজকে (শনিবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-02",
+        "dayLabel": "গতকাল (শুক্রবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-01",
+        "dayLabel": "বৃহস্পতিবার (10-01)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-30",
+        "dayLabel": "বুধবার (09-30)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-29",
+        "dayLabel": "মঙ্গলবার (09-29)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-28",
+        "dayLabel": "সোমবার (09-28)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-27",
+        "dayLabel": "রবিবার (09-27)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      }
+    ]
   },
   "u_88v4yon": {
     "id": "u_88v4yon",
@@ -54,7 +126,79 @@
     "referralCommissionHistory": [],
     "createdAt": "2026-09-22T16:08:02.883Z",
     "balanceBdt": 0,
-    "lastActiveDate": "2026-09-26"
+    "lastActiveDate": "2026-09-26",
+    "weeklyWorkHistory": [
+      {
+        "date": "2026-10-03",
+        "dayLabel": "আজকে (শনিবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-02",
+        "dayLabel": "গতকাল (শুক্রবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-01",
+        "dayLabel": "বৃহস্পতিবার (10-01)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-30",
+        "dayLabel": "বুধবার (09-30)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-29",
+        "dayLabel": "মঙ্গলবার (09-29)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-28",
+        "dayLabel": "সোমবার (09-28)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-27",
+        "dayLabel": "রবিবার (09-27)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      }
+    ]
   },
   "test_u1": {
     "id": "test_u1",
@@ -88,7 +232,79 @@
     "referralCommissionHistory": [],
     "createdAt": "2026-09-24T10:28:56.168Z",
     "lastActiveDate": "2026-09-24",
-    "balanceBdt": 0
+    "balanceBdt": 0,
+    "weeklyWorkHistory": [
+      {
+        "date": "2026-10-03",
+        "dayLabel": "আজকে (শনিবার)",
+        "adsWatched": 2,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-02",
+        "dayLabel": "গতকাল (শুক্রবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-01",
+        "dayLabel": "বৃহস্পতিবার (10-01)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-30",
+        "dayLabel": "বুধবার (09-30)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-29",
+        "dayLabel": "মঙ্গলবার (09-29)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-28",
+        "dayLabel": "সোমবার (09-28)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-27",
+        "dayLabel": "রবিবার (09-27)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      }
+    ]
   },
   "7359932887": {
     "id": "7359932887",
@@ -117,7 +333,79 @@
     "referralCommissionHistory": [],
     "createdAt": "2026-09-26T05:25:02.509Z",
     "lastActiveDate": "2026-09-28",
-    "balanceBdt": 0
+    "balanceBdt": 0,
+    "weeklyWorkHistory": [
+      {
+        "date": "2026-10-03",
+        "dayLabel": "আজকে (শনিবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-02",
+        "dayLabel": "গতকাল (শুক্রবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-01",
+        "dayLabel": "বৃহস্পতিবার (10-01)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-30",
+        "dayLabel": "বুধবার (09-30)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-29",
+        "dayLabel": "মঙ্গলবার (09-29)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-28",
+        "dayLabel": "সোমবার (09-28)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-27",
+        "dayLabel": "রবিবার (09-27)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      }
+    ]
   },
   "guest_user": {
     "id": "guest_user",
@@ -145,7 +433,79 @@
     "claimableCommissionUsd": 0,
     "referralCommissionHistory": [],
     "createdAt": "2026-09-26T05:25:31.724Z",
-    "balanceBdt": 0
+    "balanceBdt": 0,
+    "weeklyWorkHistory": [
+      {
+        "date": "2026-10-03",
+        "dayLabel": "আজকে (শনিবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-02",
+        "dayLabel": "গতকাল (শুক্রবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-01",
+        "dayLabel": "বৃহস্পতিবার (10-01)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-30",
+        "dayLabel": "বুধবার (09-30)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-29",
+        "dayLabel": "মঙ্গলবার (09-29)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-28",
+        "dayLabel": "সোমবার (09-28)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-27",
+        "dayLabel": "রবিবার (09-27)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      }
+    ]
   },
   "u_fzffi3r": {
     "id": "u_fzffi3r",
@@ -174,7 +534,79 @@
     "referralCommissionHistory": [],
     "createdAt": "2026-09-26T05:37:42.490Z",
     "lastActiveDate": "2026-10-03",
-    "balanceBdt": 0
+    "balanceBdt": 0,
+    "weeklyWorkHistory": [
+      {
+        "date": "2026-10-03",
+        "dayLabel": "আজকে (শনিবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-02",
+        "dayLabel": "গতকাল (শুক্রবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-01",
+        "dayLabel": "বৃহস্পতিবার (10-01)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-30",
+        "dayLabel": "বুধবার (09-30)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-29",
+        "dayLabel": "মঙ্গলবার (09-29)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-28",
+        "dayLabel": "সোমবার (09-28)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-27",
+        "dayLabel": "রবিবার (09-27)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      }
+    ]
   },
   "6918389524": {
     "id": "6918389524",
@@ -202,7 +634,79 @@
     "claimableCommissionUsd": 0,
     "referralCommissionHistory": [],
     "createdAt": "2026-09-26T06:55:09.643Z",
-    "balanceBdt": 0
+    "balanceBdt": 0,
+    "weeklyWorkHistory": [
+      {
+        "date": "2026-10-03",
+        "dayLabel": "আজকে (শনিবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-02",
+        "dayLabel": "গতকাল (শুক্রবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-01",
+        "dayLabel": "বৃহস্পতিবার (10-01)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-30",
+        "dayLabel": "বুধবার (09-30)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-29",
+        "dayLabel": "মঙ্গলবার (09-29)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-28",
+        "dayLabel": "সোমবার (09-28)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-27",
+        "dayLabel": "রবিবার (09-27)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      }
+    ]
   },
   "test_user_1": {
     "id": "test_user_1",
@@ -230,7 +734,79 @@
     "claimableCommissionUsd": 0,
     "referralCommissionHistory": [],
     "createdAt": "2026-09-26T11:15:17.516Z",
-    "balanceBdt": 0
+    "balanceBdt": 0,
+    "weeklyWorkHistory": [
+      {
+        "date": "2026-10-03",
+        "dayLabel": "আজকে (শনিবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-02",
+        "dayLabel": "গতকাল (শুক্রবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-01",
+        "dayLabel": "বৃহস্পতিবার (10-01)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-30",
+        "dayLabel": "বুধবার (09-30)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-29",
+        "dayLabel": "মঙ্গলবার (09-29)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-28",
+        "dayLabel": "সোমবার (09-28)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-27",
+        "dayLabel": "রবিবার (09-27)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      }
+    ]
   },
   "test_tester_99": {
     "id": "test_tester_99",
@@ -258,7 +834,79 @@
     "claimableCommissionUsd": 0,
     "referralCommissionHistory": [],
     "createdAt": "2026-09-26T11:15:23.773Z",
-    "balanceBdt": 0
+    "balanceBdt": 0,
+    "weeklyWorkHistory": [
+      {
+        "date": "2026-10-03",
+        "dayLabel": "আজকে (শনিবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-02",
+        "dayLabel": "গতকাল (শুক্রবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-01",
+        "dayLabel": "বৃহস্পতিবার (10-01)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-30",
+        "dayLabel": "বুধবার (09-30)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-29",
+        "dayLabel": "মঙ্গলবার (09-29)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-28",
+        "dayLabel": "সোমবার (09-28)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-27",
+        "dayLabel": "রবিবার (09-27)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      }
+    ]
   },
   "u_02rpkta": {
     "id": "u_02rpkta",
@@ -285,7 +933,79 @@
     "totalCommissionEarnedUsd": 0,
     "claimableCommissionUsd": 0,
     "referralCommissionHistory": [],
-    "createdAt": "2026-09-28T07:08:23.950Z"
+    "createdAt": "2026-09-28T07:08:23.950Z",
+    "weeklyWorkHistory": [
+      {
+        "date": "2026-10-03",
+        "dayLabel": "আজকে (শনিবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-02",
+        "dayLabel": "গতকাল (শুক্রবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-01",
+        "dayLabel": "বৃহস্পতিবার (10-01)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-30",
+        "dayLabel": "বুধবার (09-30)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-29",
+        "dayLabel": "মঙ্গলবার (09-29)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-28",
+        "dayLabel": "সোমবার (09-28)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-27",
+        "dayLabel": "রবিবার (09-27)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      }
+    ]
   },
   "8931946752": {
     "id": "8931946752",
@@ -313,7 +1033,79 @@
     "claimableCommissionUsd": 0,
     "referralCommissionHistory": [],
     "createdAt": "2026-09-28T08:00:34.712Z",
-    "lastActiveDate": "2026-10-03"
+    "lastActiveDate": "2026-10-03",
+    "weeklyWorkHistory": [
+      {
+        "date": "2026-10-03",
+        "dayLabel": "আজকে (শনিবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-02",
+        "dayLabel": "গতকাল (শুক্রবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-01",
+        "dayLabel": "বৃহস্পতিবার (10-01)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-30",
+        "dayLabel": "বুধবার (09-30)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-29",
+        "dayLabel": "মঙ্গলবার (09-29)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-28",
+        "dayLabel": "সোমবার (09-28)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-27",
+        "dayLabel": "রবিবার (09-27)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      }
+    ]
   },
   "8519369323": {
     "id": "8519369323",
@@ -346,7 +1138,79 @@
     "claimableCommissionUsd": 0,
     "referralCommissionHistory": [],
     "createdAt": "2026-09-29T04:22:58.891Z",
-    "lastActiveDate": "2026-09-29"
+    "lastActiveDate": "2026-09-29",
+    "weeklyWorkHistory": [
+      {
+        "date": "2026-10-03",
+        "dayLabel": "আজকে (শনিবার)",
+        "adsWatched": 4,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-02",
+        "dayLabel": "গতকাল (শুক্রবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-01",
+        "dayLabel": "বৃহস্পতিবার (10-01)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-30",
+        "dayLabel": "বুধবার (09-30)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-29",
+        "dayLabel": "মঙ্গলবার (09-29)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-28",
+        "dayLabel": "সোমবার (09-28)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-27",
+        "dayLabel": "রবিবার (09-27)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      }
+    ]
   },
   "8868777320": {
     "id": "8868777320",
@@ -376,7 +1240,79 @@
     "claimableCommissionUsd": 0,
     "referralCommissionHistory": [],
     "createdAt": "2026-09-29T05:43:55.215Z",
-    "lastActiveDate": "2026-09-29"
+    "lastActiveDate": "2026-09-29",
+    "weeklyWorkHistory": [
+      {
+        "date": "2026-10-03",
+        "dayLabel": "আজকে (শনিবার)",
+        "adsWatched": 40,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-02",
+        "dayLabel": "গতকাল (শুক্রবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-01",
+        "dayLabel": "বৃহস্পতিবার (10-01)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-30",
+        "dayLabel": "বুধবার (09-30)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-29",
+        "dayLabel": "মঙ্গলবার (09-29)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-28",
+        "dayLabel": "সোমবার (09-28)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-27",
+        "dayLabel": "রবিবার (09-27)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      }
+    ]
   },
   "8572238433": {
     "id": "8572238433",
@@ -404,7 +1340,79 @@
     "claimableCommissionUsd": 0,
     "referralCommissionHistory": [],
     "createdAt": "2026-09-29T10:19:10.411Z",
-    "lastActiveDate": "2026-09-29"
+    "lastActiveDate": "2026-09-29",
+    "weeklyWorkHistory": [
+      {
+        "date": "2026-10-03",
+        "dayLabel": "আজকে (শনিবার)",
+        "adsWatched": 40,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-02",
+        "dayLabel": "গতকাল (শুক্রবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-01",
+        "dayLabel": "বৃহস্পতিবার (10-01)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-30",
+        "dayLabel": "বুধবার (09-30)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-29",
+        "dayLabel": "মঙ্গলবার (09-29)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-28",
+        "dayLabel": "সোমবার (09-28)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-27",
+        "dayLabel": "রবিবার (09-27)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      }
+    ]
   },
   "6973851085": {
     "id": "6973851085",
@@ -432,7 +1440,79 @@
     "claimableCommissionUsd": 0,
     "referralCommissionHistory": [],
     "createdAt": "2026-09-29T10:28:03.837Z",
-    "lastActiveDate": "2026-10-03"
+    "lastActiveDate": "2026-10-03",
+    "weeklyWorkHistory": [
+      {
+        "date": "2026-10-03",
+        "dayLabel": "আজকে (শনিবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-02",
+        "dayLabel": "গতকাল (শুক্রবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-01",
+        "dayLabel": "বৃহস্পতিবার (10-01)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-30",
+        "dayLabel": "বুধবার (09-30)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-29",
+        "dayLabel": "মঙ্গলবার (09-29)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-28",
+        "dayLabel": "সোমবার (09-28)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-27",
+        "dayLabel": "রবিবার (09-27)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      }
+    ]
   },
   "u_9m36n15": {
     "id": "u_9m36n15",
@@ -460,7 +1540,79 @@
     "claimableCommissionUsd": 0,
     "referralCommissionHistory": [],
     "createdAt": "2026-09-29T16:16:02.358Z",
-    "lastActiveDate": "2026-09-30"
+    "lastActiveDate": "2026-09-30",
+    "weeklyWorkHistory": [
+      {
+        "date": "2026-10-03",
+        "dayLabel": "আজকে (শনিবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-02",
+        "dayLabel": "গতকাল (শুক্রবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-01",
+        "dayLabel": "বৃহস্পতিবার (10-01)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-30",
+        "dayLabel": "বুধবার (09-30)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-29",
+        "dayLabel": "মঙ্গলবার (09-29)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-28",
+        "dayLabel": "সোমবার (09-28)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-27",
+        "dayLabel": "রবিবার (09-27)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      }
+    ]
   },
   "u_xxianrt": {
     "id": "u_xxianrt",
@@ -488,7 +1640,79 @@
     "claimableCommissionUsd": 0,
     "referralCommissionHistory": [],
     "createdAt": "2026-09-29T16:16:24.559Z",
-    "lastActiveDate": "2026-09-29"
+    "lastActiveDate": "2026-09-29",
+    "weeklyWorkHistory": [
+      {
+        "date": "2026-10-03",
+        "dayLabel": "আজকে (শনিবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-02",
+        "dayLabel": "গতকাল (শুক্রবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-01",
+        "dayLabel": "বৃহস্পতিবার (10-01)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-30",
+        "dayLabel": "বুধবার (09-30)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-29",
+        "dayLabel": "মঙ্গলবার (09-29)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-28",
+        "dayLabel": "সোমবার (09-28)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-27",
+        "dayLabel": "রবিবার (09-27)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      }
+    ]
   },
   "8771252945": {
     "id": "8771252945",
@@ -516,7 +1740,79 @@
     "claimableCommissionUsd": 0,
     "referralCommissionHistory": [],
     "createdAt": "2026-09-29T20:15:55.175Z",
-    "lastActiveDate": "2026-09-30"
+    "lastActiveDate": "2026-09-30",
+    "weeklyWorkHistory": [
+      {
+        "date": "2026-10-03",
+        "dayLabel": "আজকে (শনিবার)",
+        "adsWatched": 40,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-02",
+        "dayLabel": "গতকাল (শুক্রবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-01",
+        "dayLabel": "বৃহস্পতিবার (10-01)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-30",
+        "dayLabel": "বুধবার (09-30)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-29",
+        "dayLabel": "মঙ্গলবার (09-29)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-28",
+        "dayLabel": "সোমবার (09-28)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-27",
+        "dayLabel": "রবিবার (09-27)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      }
+    ]
   },
   "8513709402": {
     "id": "8513709402",
@@ -544,6 +1840,78 @@
     "claimableCommissionUsd": 0,
     "referralCommissionHistory": [],
     "createdAt": "2026-10-03T10:03:47.020Z",
-    "lastActiveDate": "2026-10-03"
+    "lastActiveDate": "2026-10-03",
+    "weeklyWorkHistory": [
+      {
+        "date": "2026-10-03",
+        "dayLabel": "আজকে (শনিবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-02",
+        "dayLabel": "গতকাল (শুক্রবার)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-10-01",
+        "dayLabel": "বৃহস্পতিবার (10-01)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-30",
+        "dayLabel": "বুধবার (09-30)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-29",
+        "dayLabel": "মঙ্গলবার (09-29)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-28",
+        "dayLabel": "সোমবার (09-28)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      },
+      {
+        "date": "2026-09-27",
+        "dayLabel": "রবিবার (09-27)",
+        "adsWatched": 0,
+        "tasksCompleted": 0,
+        "adClicks": 0,
+        "earnedUsd": 0,
+        "earnedBdt": 0,
+        "referrals": 0
+      }
+    ]
   }
 }
