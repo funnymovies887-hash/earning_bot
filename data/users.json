@@ -173,7 +173,7 @@
     "claimableCommissionUsd": 0,
     "referralCommissionHistory": [],
     "createdAt": "2026-09-26T05:37:42.490Z",
-    "lastActiveDate": "2026-10-01",
+    "lastActiveDate": "2026-10-03",
     "balanceBdt": 0
   },
   "6918389524": {
@@ -432,7 +432,7 @@
     "claimableCommissionUsd": 0,
     "referralCommissionHistory": [],
     "createdAt": "2026-09-29T10:28:03.837Z",
-    "lastActiveDate": "2026-09-29"
+    "lastActiveDate": "2026-10-03"
   },
   "u_9m36n15": {
     "id": "u_9m36n15",
@@ -517,5 +517,33 @@
     "referralCommissionHistory": [],
     "createdAt": "2026-09-29T20:15:55.175Z",
     "lastActiveDate": "2026-09-30"
+  },
+  "8513709402": {
+    "id": "8513709402",
+    "username": "@user_9402",
+    "displayName": "Raha Moni",
+    "email": "",
+    "avatarUrl": "https://t.me/i/userpic/320/1pGkn_4p5k3s5n5uSgC0GftXUKU4NgtcC6SxL2fzuhLtZQRayLfovEgtKuxCMU_b.svg",
+    "role": "Free Member",
+    "balanceUsd": 0,
+    "pendingReferralBonusUsd": 0,
+    "joinedCount": 0,
+    "activeCount": 0,
+    "inactiveCount": 0,
+    "todayReferrals": 0,
+    "activeReferralsWithActivity": 0,
+    "adsWatchedToday": 0,
+    "dailyAdLimit": 40,
+    "referralCode": "user_8513709402",
+    "language": "bn",
+    "currency": "BDT",
+    "claimedDailyTiers": [],
+    "completedTaskIds": [],
+    "referralCommissionRate": 5,
+    "totalCommissionEarnedUsd": 0,
+    "claimableCommissionUsd": 0,
+    "referralCommissionHistory": [],
+    "createdAt": "2026-10-03T10:03:47.020Z",
+    "lastActiveDate": "2026-10-03"
   }
 }
