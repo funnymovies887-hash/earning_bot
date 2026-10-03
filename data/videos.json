@@ -17,7 +17,7 @@
     "subCategory": "Telegram",
     "thumbnail": "https://images.unsplash.com/photo-1616469829941-c7200edec809?w=500&auto=format&fit=crop&q=60",
     "duration": "06:30",
-    "rewardUsd": 0.20,
+    "rewardUsd": 0.2,
     "isDemo": true,
     "views": 3890
   },
@@ -61,7 +61,7 @@
     "subCategory": "Monitag",
     "thumbnail": "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=500&auto=format&fit=crop&q=60",
     "duration": "08:20",
-    "rewardUsd": 0.30,
+    "rewardUsd": 0.3,
     "isDemo": true,
     "views": 4720
   },
@@ -83,7 +83,7 @@
     "subCategory": "Adsterra",
     "thumbnail": "https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=500&auto=format&fit=crop&q=60",
     "duration": "05:15",
-    "rewardUsd": 0.20,
+    "rewardUsd": 0.2,
     "isDemo": true,
     "views": 7420
   },
