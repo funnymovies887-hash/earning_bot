@@ -126,7 +126,7 @@
     "referralCommissionHistory": [],
     "createdAt": "2026-09-22T16:08:02.883Z",
     "balanceBdt": 0,
-    "lastActiveDate": "2026-09-26",
+    "lastActiveDate": "2026-10-04",
     "weeklyWorkHistory": [
       {
         "date": "2026-10-03",
@@ -1913,5 +1913,32 @@
         "referrals": 0
       }
     ]
+  },
+  "test_tester": {
+    "id": "test_tester",
+    "username": "@user_ester",
+    "displayName": "সদস্য #ster",
+    "email": "",
+    "avatarUrl": "https://api.dicebear.com/7.x/bottts/svg?seed=test_tester",
+    "role": "Free Member",
+    "balanceUsd": 0,
+    "pendingReferralBonusUsd": 0,
+    "joinedCount": 0,
+    "activeCount": 0,
+    "inactiveCount": 0,
+    "todayReferrals": 0,
+    "activeReferralsWithActivity": 0,
+    "adsWatchedToday": 0,
+    "dailyAdLimit": 40,
+    "referralCode": "user_test_tester",
+    "language": "bn",
+    "currency": "BDT",
+    "claimedDailyTiers": [],
+    "completedTaskIds": [],
+    "referralCommissionRate": 5,
+    "totalCommissionEarnedUsd": 0,
+    "claimableCommissionUsd": 0,
+    "referralCommissionHistory": [],
+    "createdAt": "2026-10-04T08:38:45.725Z"
   }
 }

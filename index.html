@@ -14,6 +14,20 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      html, body, #root {
+        background-color: #0f172a !important;
+        color: #ffffff;
+        overscroll-behavior: none !important;
+        overscroll-behavior-y: none !important;
+        -webkit-tap-highlight-color: transparent !important;
+        -webkit-tap-highlight-color: rgba(0,0,0,0) !important;
+      }
+      *, *::before, *::after {
+        -webkit-tap-highlight-color: transparent !important;
+        outline: none !important;
+      }
+    </style>
     <!-- Pre-init Telegram WebApp version hook: ensures sessionStorage sets version 9.0 BEFORE telegram-web-app.js evaluates closure variables -->
     <script>
       (function() {

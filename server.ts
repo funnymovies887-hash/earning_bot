@@ -293,14 +293,37 @@ if (!fs.existsSync(path.join(DATA_DIR, "income_methods_config.json"))) {
   saveJsonFile("income_methods_config.json", incomeMethodsConfig);
 }
 
-let livePayouts = [
-  { id: 'p-1', userName: 'Badsha Khan', amount: '$10.30', method: 'bKash', timeAgo: '1m ago', status: 'Success' },
-  { id: 'p-2', userName: 'Rahman', amount: '৳ 1,500', method: 'Nagad', timeAgo: '3m ago', status: 'Success' },
-  { id: 'p-3', userName: 'Samiul', amount: '$25.00', method: 'Binance Pay', timeAgo: '6m ago', status: 'Success' },
-  { id: 'p-4', userName: 'Anik Hasan', amount: '৳ 850', method: 'Rocket', timeAgo: '9m ago', status: 'Success' },
-  { id: 'p-5', userName: 'Tanvir Hossain', amount: '$15.00', method: 'bKash', timeAgo: '12m ago', status: 'Success' },
-  { id: 'p-6', userName: 'Rajesh Kumar', amount: '₹ 1,200', method: 'PayTM', timeAgo: '15m ago', status: 'Success' },
-];
+// Real live payouts strictly derived from admin-approved withdrawals (zero fake/mock data)
+function getApprovedLivePayouts(): any[] {
+  return (withdrawals || [])
+    .filter((w) => w && w.status === "Approved")
+    .map((w) => {
+      const bdtAmount = w.currency === 'BDT' ? Number(w.amount) : Math.round(Number(w.amount) * 120);
+      const rawName = (w.userName || "User").trim();
+      const maskedName = rawName.length > 4 
+        ? rawName.slice(0, 3) + "***" + (rawName.length > 6 ? rawName.slice(-2) : "") 
+        : rawName + "***";
+      const rawAccount = (w.accountNumber || "").trim();
+      const maskedAccount = rawAccount.length > 6 
+        ? rawAccount.slice(0, 4) + "****" + rawAccount.slice(-3) 
+        : (rawAccount ? rawAccount.slice(0, 3) + "***" : "");
+      return {
+        id: "payout-" + w.id,
+        userName: maskedName,
+        amount: `৳ ${bdtAmount}`,
+        method: w.method || 'bKash',
+        accountNumber: maskedAccount,
+        timeAgo: 'অনুমোদিত',
+        status: 'Success',
+        trxId: (w as any).trxId || ("TXN" + String(w.id || Date.now()).slice(-8)),
+        timestamp: (w as any).approvedAt || (w.createdAt ? new Date(w.createdAt).getTime() : Date.now()),
+      };
+    })
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .slice(0, 30);
+}
+
+let livePayouts: any[] = getApprovedLivePayouts();
 
 let pushSubscriptions: any[] = [];
 
@@ -2041,12 +2064,18 @@ async function startServer() {
     }
 
     item.status = status;
+    if (status === "Approved") {
+      const trxId = (item as any).trxId || ("TXN" + Date.now().toString().slice(-8));
+      (item as any).approvedAt = Date.now();
+      (item as any).trxId = trxId;
+    }
     saveJsonFile("withdrawals.json", withdrawals);
+    livePayouts = getApprovedLivePayouts();
 
     if (status === "Approved") {
       const bdtAmount = item.currency === 'BDT' ? Number(item.amount) : Math.round(Number(item.amount) * 120);
       const usdAmount = item.currency === 'USD' ? Number(item.amount) : +(Number(item.amount) / 120).toFixed(2);
-      const trxId = "TXN" + Date.now().toString().slice(-8);
+      const trxId = (item as any).trxId;
       const timeDhaka = new Date().toLocaleString("en-US", { timeZone: "Asia/Dhaka" });
 
       // Clean privacy masking for user name and account number
@@ -2059,21 +2088,7 @@ async function startServer() {
         ? rawAccount.slice(0, 4) + "****" + rawAccount.slice(-3) 
         : rawAccount;
 
-      // 1. Immediately prepend to livePayouts stream for all Mini App users
-      const newLivePayout = {
-        id: "payout-" + Date.now(),
-        userName: maskedName,
-        amount: `৳ ${bdtAmount}`,
-        method: item.method || 'bKash',
-        timeAgo: 'এইমাত্র',
-        status: 'Success',
-        trxId,
-        timestamp: Date.now(),
-      };
-      livePayouts.unshift(newLivePayout);
-      livePayouts = livePayouts.slice(0, 30);
-
-      // 2. Personal notification for the user inside Mini App
+      // 1. Personal notification for the user inside Mini App
       const recipientUser = usersMap[item.userId];
       if (recipientUser) {
         recipientUser.personalNotifications = recipientUser.personalNotifications || [];
@@ -2090,7 +2105,7 @@ async function startServer() {
         saveJsonFile("users.json", usersMap);
       }
 
-      // 3. Send Telegram Payment Proof Message to Official Channels with "Open App" button!
+      // 2. Send Telegram Payment Proof Message to Official Channels and all users with "Open App" button!
       const botToken = telegramConfig.botToken || process.env.TELEGRAM_BOT_TOKEN;
       const botHandle = (telegramConfig.botUsername || "CholoIncomeKoriBot").replace("@", "");
       const miniAppUrl = `https://t.me/${botHandle}/app`;
@@ -2143,27 +2158,31 @@ async function startServer() {
           }
         }
 
-        // Also send directly to user's Telegram inbox above Open App if userId is numeric:
-        if (item.userId && /^\d+$/.test(item.userId)) {
+        // Also broadcast directly to all registered bot users so every user sees payment proof above "Open App"
+        const allBotUserIds = Object.keys(usersMap).filter((uid) => /^\d+$/.test(uid));
+        for (const uid of allBotUserIds) {
           try {
+            const isTargetUser = uid === item.userId;
+            const messageToSend = isTargetUser
+              ? `🎉 <b>উইথড্র পেমেন্ট সফলভাবে প্রদান করা হয়েছে!</b>\n\n` +
+                `প্রিয় সদস্য, আপনার <b>৳ ${bdtAmount} টাকা</b> (${item.method}) উইথড্র সফলভাবে অনুমোদিত হয়েছে ও টাকা পাঠানো হয়েছে।\n\n` +
+                `🧾 TrxID: <code>${trxId}</code>\n` +
+                `⏰ সময়: ${timeDhaka}\n\n` +
+                `টেলিগ্রাম চ্যাটে "Open App" বাটনে চাপ দিয়ে যেকোনো সময় আবার আয় করুন!`
+              : paymentProofHtml;
+
             await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                chat_id: item.userId,
-                text:
-                  `🎉 <b>উইথড্র পেমেন্ট সফলভাবে প্রদান করা হয়েছে!</b>\n\n` +
-                  `প্রিয় সদস্য, আপনার <b>৳ ${bdtAmount} টাকা</b> (${item.method}) উইথড্র সফলভাবে অনুমোদিত হয়েছে ও টাকা পাঠানো হয়েছে।\n\n` +
-                  `🧾 TrxID: <code>${trxId}</code>\n` +
-                  `⏰ সময়: ${timeDhaka}\n\n` +
-                  `টেলিগ্রাম চ্যাটে "Open App" বাটনে চাপ দিয়ে যেকোনো সময় আবার আয় করুন!`,
+                chat_id: uid,
+                text: messageToSend,
                 parse_mode: "HTML",
                 reply_markup: inlineKeyboard,
               }),
             });
-            console.log(`[PaymentProof] Sent direct confirmation to user ${item.userId}`);
           } catch (uErr: any) {
-            console.warn(`[PaymentProof] Direct user error:`, uErr.message);
+            // Ignore single chat deliver errors
           }
         }
       }
@@ -2186,6 +2205,7 @@ async function startServer() {
     const { id } = req.body;
     withdrawals = withdrawals.filter((w) => w.id !== id);
     saveJsonFile("withdrawals.json", withdrawals);
+    livePayouts = getApprovedLivePayouts();
     res.json({ success: true, remaining: withdrawals.length });
   });
 
@@ -2564,16 +2584,6 @@ async function startServer() {
     user.balanceUsd = Math.max(0, +(Number(user.balanceUsd || 0) - deductUsd).toFixed(6));
     saveJsonFile("withdrawals.json", withdrawals);
     saveJsonFile("users.json", usersMap);
-
-    // Also add to live payouts
-    livePayouts.unshift({
-      id: "p-" + Date.now(),
-      userName: user.displayName,
-      amount: `${currency === 'BDT' ? '৳' : currency === 'INR' ? '₹' : '$'} ${withdrawAmount}`,
-      method,
-      timeAgo: "Just now",
-      status: "Processing",
-    });
 
     res.json({ success: true, withdrawal: newWithdrawal, balanceUsd: user.balanceUsd });
   });

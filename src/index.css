@@ -42,17 +42,27 @@
 /* Eliminate button outlines, tap boxes, and highlight rings on all elements */
 *, *::before, *::after {
   -webkit-tap-highlight-color: transparent !important;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0) !important;
   outline: none !important;
 }
 
-button, a, input, select, textarea, div, span, img {
+button, a, [role="button"], input, select, textarea, div, span, img {
   -webkit-tap-highlight-color: transparent !important;
-  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0) !important;
+  -webkit-touch-callout: none !important;
 }
 
-button:focus, button:focus-visible, a:focus, a:focus-visible, input:focus, textarea:focus {
+button, a, [role="button"] {
+  outline: none !important;
+  touch-action: manipulation; /* Removes 300ms tap delay on mobile devices for instant smooth clicks */
+}
+
+button:focus, button:focus-visible, button:active,
+a:focus, a:focus-visible, a:active,
+input:focus, textarea:focus, select:focus {
   outline: none !important;
   box-shadow: none !important;
+  -webkit-tap-highlight-color: transparent !important;
 }
 
 /* Hardware accelerated ultra smooth scrolling without stutter or hang */

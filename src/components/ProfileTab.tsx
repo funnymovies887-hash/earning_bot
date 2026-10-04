@@ -182,25 +182,34 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
         </div>
 
         <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
-          {payoutsList.map((payout, idx) => (
-            <div
-              key={payout.id || idx}
-              className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between text-xs hover:bg-slate-100/70 transition-colors"
-            >
-              <div>
-                <span className="font-extrabold text-slate-900">{payout.userName}</span>
-                <p className="text-[10px] text-slate-400">
-                  via {payout.method} • {payout.timeAgo || 'সফল'} {payout.trxId ? `• ${payout.trxId}` : ''}
-                </p>
-              </div>
-              <div className="text-right">
-                <span className="font-black text-emerald-600 block">{payout.amount}</span>
-                <span className="text-[9px] font-bold text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                  ✅ Paid
-                </span>
-              </div>
+          {payoutsList.length === 0 ? (
+            <div className="py-6 px-3 text-center text-xs bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
+              <p className="font-bold text-slate-600">এখনও কোনো উত্তোলন অনুমোদন করা হয়নি</p>
+              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                কোনো ইউজার টাকা উত্তোলন করলে এবং অ্যাডমিন তা অনুমোদন করার সাথে সাথেই আসল পেমেন্ট প্রুফ ও TrxID এখানে লাইভ দৃশ্যমান হবে।
+              </p>
             </div>
-          ))}
+          ) : (
+            payoutsList.map((payout, idx) => (
+              <div
+                key={payout.id || idx}
+                className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between text-xs hover:bg-slate-100/70 transition-colors"
+              >
+                <div>
+                  <span className="font-extrabold text-slate-900">{payout.userName}</span>
+                  <p className="text-[10px] text-slate-400">
+                    via {payout.method} • {payout.timeAgo || 'সফল'} {payout.trxId ? `• ${payout.trxId}` : ''}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="font-black text-emerald-600 block">{payout.amount}</span>
+                  <span className="text-[9px] font-bold text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                    ✅ Paid
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

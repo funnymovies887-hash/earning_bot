@@ -575,16 +575,9 @@ export const LEADERBOARD_USERS: LeaderboardEntry[] = [
   { rank: 12, name: 'Rakib', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&auto=format&fit=crop&q=60', bonus: '1 Free Bonus', statValue: '1', statLabel: 'REFS' },
 ];
 
-export const INITIAL_LIVE_PAYOUTS: LivePayoutItem[] = [
-  { id: 'p-1', userName: 'Badsha Khan', amount: '$10.30', method: 'bKash', timeAgo: '1m ago', status: 'Success' },
-  { id: 'p-2', userName: 'Rahman', amount: '৳ 1,500', method: 'Nagad', timeAgo: '3m ago', status: 'Success' },
-  { id: 'p-3', userName: 'Samiul', amount: '$25.00', method: 'Binance Pay', timeAgo: '6m ago', status: 'Success' },
-  { id: 'p-4', userName: 'Anik Hasan', amount: '৳ 850', method: 'Rocket', timeAgo: '9m ago', status: 'Success' },
-  { id: 'p-5', userName: 'Tanvir Hossain', amount: '$15.00', method: 'bKash', timeAgo: '12m ago', status: 'Success' },
-  { id: 'p-6', userName: 'Rajesh Kumar', amount: '₹ 1,200', method: 'PayTM', timeAgo: '15m ago', status: 'Success' },
-];
+export const INITIAL_LIVE_PAYOUTS: LivePayoutItem[] = [];
 
-export const LIVE_PAYOUTS = INITIAL_LIVE_PAYOUTS;
+export const LIVE_PAYOUTS: LivePayoutItem[] = [];
 
 export const ADMIN_USER_TEMPLATE = {
   id: 'usr_78912',

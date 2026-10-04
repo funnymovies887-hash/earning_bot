@@ -167,6 +167,11 @@ export const AdminChannelPublisherTab: React.FC = () => {
 
     setIsPublishing(true);
     try {
+      let finalFullVideoUrl = fullVideoUrl.trim();
+      if (finalFullVideoUrl && !finalFullVideoUrl.startsWith('http://') && !finalFullVideoUrl.startsWith('https://')) {
+        finalFullVideoUrl = `https://t.me/CholoIncomeKoriBot/app?startapp=${finalFullVideoUrl.startsWith('video_') ? finalFullVideoUrl : 'video_' + finalFullVideoUrl}`;
+      }
+
       const res = await fetch('/api/admin/channel-publisher/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -180,7 +185,7 @@ export const AdminChannelPublisherTab: React.FC = () => {
           title: title.trim(),
           description: description.trim(),
           demoUrl: demoUrl.trim(),
-          fullVideoUrl: fullVideoUrl.trim(),
+          fullVideoUrl: finalFullVideoUrl,
           tutorialUrl: tutorialUrl.trim(),
         }),
       });
@@ -607,15 +612,43 @@ export const AdminChannelPublisherTab: React.FC = () => {
                   </div>
                 </div>
 
+                <div className="pt-2">
+                  <label className="block text-[11px] font-bold text-amber-300 mb-1 flex items-center gap-1.5">
+                    <Film className="w-3.5 h-3.5" />
+                    <span>🎬 এক ক্লিকে লকড ভিডিও সিলেক্ট করুন (বাটন ২ স্বয়ংক্রিয় সেট হবে):</span>
+                  </label>
+                  <select
+                    className="w-full bg-slate-800 border border-amber-500/40 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400"
+                    onChange={(e) => {
+                      const selectedId = e.target.value;
+                      if (!selectedId) return;
+                      const found = lockedVideos.find((v) => v.id === selectedId);
+                      if (found) {
+                        handleAutofillFromVideo(found);
+                      } else {
+                        setFullVideoUrl(`https://t.me/CholoIncomeKoriBot/app?startapp=video_${selectedId}`);
+                      }
+                    }}
+                    defaultValue=""
+                  >
+                    <option value="" disabled>-- ভিডিও তালিকা থেকে পছন্দ করুন --</option>
+                    {lockedVideos.map((lv) => (
+                      <option key={lv.id} value={lv.id}>
+                        {lv.title} (ID: {lv.id})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <label className="block text-[11px] font-bold text-blue-300 mb-1 flex items-center gap-1.5">
                   <Zap className="w-3.5 h-3.5" />
-                  <span>বাটন ২: “🚀 Watch Full Video (Watch Now)” URL *</span>
+                  <span>বাটন ২: “🚀 Watch Full Video (Watch Now)” URL বা ভিডিও আইডি *</span>
                 </label>
                 <input
-                  type="url"
+                  type="text"
                   value={fullVideoUrl}
                   onChange={(e) => setFullVideoUrl(e.target.value)}
-                  placeholder="https://t.me/CholoIncomeKoriBot/app?startapp=video_1"
+                  placeholder="https://t.me/CholoIncomeKoriBot/app?startapp=video_lock-vid-1... বা শুধু ভিডিও আইডি"
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 font-mono"
                   required
                 />

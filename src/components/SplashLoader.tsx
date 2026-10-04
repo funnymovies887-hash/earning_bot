@@ -26,19 +26,19 @@ interface SplashLoaderProps {
 }
 
 export const SplashLoader: React.FC<SplashLoaderProps> = ({ onComplete }) => {
-  const [progress, setProgress] = React.useState(15);
+  const [progress, setProgress] = React.useState(35);
 
   React.useEffect(() => {
     const timer = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
           clearInterval(timer);
-          setTimeout(onComplete, 200);
+          setTimeout(onComplete, 80);
           return 100;
         }
-        return prev + Math.floor(Math.random() * 25) + 20;
+        return prev + Math.floor(Math.random() * 25) + 30;
       });
-    }, 120);
+    }, 45);
 
     return () => clearInterval(timer);
   }, [onComplete]);

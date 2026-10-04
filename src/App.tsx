@@ -87,15 +87,49 @@ function extractTelegramStartParam(): string | null {
   try {
     const tg = typeof window !== 'undefined' ? (window as any).Telegram?.WebApp : null;
     if (tg?.initDataUnsafe?.start_param) {
-      return String(tg.initDataUnsafe.start_param);
+      const p = String(tg.initDataUnsafe.start_param);
+      try { sessionStorage.setItem('tg_start_param', p); } catch {}
+      return p;
     }
+
+    if (tg?.initData) {
+      try {
+        const initDataParams = new URLSearchParams(tg.initData);
+        const fromInitData =
+          initDataParams.get('start_param') ||
+          initDataParams.get('startapp') ||
+          initDataParams.get('video');
+        if (fromInitData) {
+          try { sessionStorage.setItem('tg_start_param', fromInitData); } catch {}
+          return fromInitData;
+        }
+      } catch {}
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const fromSearch =
       urlParams.get('tgWebAppStartParam') ||
       urlParams.get('startapp') ||
       urlParams.get('start_param') ||
-      urlParams.get('video');
-    if (fromSearch) return fromSearch;
+      urlParams.get('video') ||
+      urlParams.get('vid');
+    if (fromSearch) {
+      try { sessionStorage.setItem('tg_start_param', fromSearch); } catch {}
+      return fromSearch;
+    }
+
+    // Check tgWebAppData inside search
+    const rawSearchTgData = urlParams.get('tgWebAppData');
+    if (rawSearchTgData) {
+      try {
+        const innerParams = new URLSearchParams(rawSearchTgData);
+        const innerStart = innerParams.get('start_param') || innerParams.get('startapp') || innerParams.get('video');
+        if (innerStart) {
+          try { sessionStorage.setItem('tg_start_param', innerStart); } catch {}
+          return innerStart;
+        }
+      } catch {}
+    }
 
     if (window.location.hash) {
       const hashContent = window.location.hash.startsWith('#')
@@ -106,9 +140,31 @@ function extractTelegramStartParam(): string | null {
         hashParams.get('tgWebAppStartParam') ||
         hashParams.get('startapp') ||
         hashParams.get('start_param') ||
-        hashParams.get('video');
-      if (fromHash) return fromHash;
+        hashParams.get('video') ||
+        hashParams.get('vid');
+      if (fromHash) {
+        try { sessionStorage.setItem('tg_start_param', fromHash); } catch {}
+        return fromHash;
+      }
+
+      // Check tgWebAppData inside hash
+      const rawHashTgData = hashParams.get('tgWebAppData');
+      if (rawHashTgData) {
+        try {
+          const innerHashParams = new URLSearchParams(rawHashTgData);
+          const innerStart = innerHashParams.get('start_param') || innerHashParams.get('startapp') || innerHashParams.get('video');
+          if (innerStart) {
+            try { sessionStorage.setItem('tg_start_param', innerStart); } catch {}
+            return innerStart;
+          }
+        } catch {}
+      }
     }
+
+    try {
+      const saved = sessionStorage.getItem('tg_start_param');
+      if (saved) return saved;
+    } catch {}
   } catch {}
   return null;
 }
@@ -126,10 +182,12 @@ function matchAdLockedVideo(vids: any[], param: string): any | null {
   found = vids.find((v) => v.id.includes(stripped) || stripped.includes(v.id));
   if (found) return found;
 
-  // 3. Number index (e.g. 1 -> 1st video, 2 -> 2nd video)
-  const num = parseInt(stripped, 10);
-  if (!isNaN(num) && num >= 1 && num <= vids.length) {
-    return vids[num - 1];
+  // 3. Number index (e.g. 1 -> 1st video, 2 -> 2nd video) only for small integers
+  if (/^\d{1,2}$/.test(stripped)) {
+    const num = parseInt(stripped, 10);
+    if (!isNaN(num) && num >= 1 && num <= vids.length) {
+      return vids[num - 1];
+    }
   }
 
   // 4. Title match
@@ -359,6 +417,8 @@ export default function App() {
           const matched = matchAdLockedVideo(vids, startParam);
           if (matched) {
             console.log('[DeepLink] Matched video from startapp:', matched.title);
+            setShowSplash(false);
+            setShowWelcome(false);
             setActiveAdLockedVideo(matched);
             setActiveTab('home');
           }
