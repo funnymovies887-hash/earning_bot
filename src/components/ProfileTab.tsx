@@ -38,6 +38,18 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
 }) => {
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
   const [copied, setCopied] = React.useState(false);
+  const [payoutsList, setPayoutsList] = React.useState<any[]>(LIVE_PAYOUTS);
+
+  React.useEffect(() => {
+    fetch('/api/live-payouts')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setPayoutsList(data);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const referralUrl = `https://t.me/${user.referralCode || 'CholoIncomeKoriBot'}?start=${user.id || 'ref101'}`;
 
@@ -170,19 +182,22 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
         </div>
 
         <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
-          {LIVE_PAYOUTS.map((payout, idx) => (
+          {payoutsList.map((payout, idx) => (
             <div
-              key={idx}
+              key={payout.id || idx}
               className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between text-xs hover:bg-slate-100/70 transition-colors"
             >
               <div>
                 <span className="font-extrabold text-slate-900">{payout.userName}</span>
                 <p className="text-[10px] text-slate-400">
-                  via {payout.method} • {payout.timeAgo}
+                  via {payout.method} • {payout.timeAgo || 'সফল'} {payout.trxId ? `• ${payout.trxId}` : ''}
                 </p>
               </div>
-              <div className="text-right font-black text-emerald-600">
-                {payout.amount}
+              <div className="text-right">
+                <span className="font-black text-emerald-600 block">{payout.amount}</span>
+                <span className="text-[9px] font-bold text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                  ✅ Paid
+                </span>
               </div>
             </div>
           ))}

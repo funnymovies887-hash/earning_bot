@@ -60,8 +60,9 @@ function getInitialTelegramUser() {
       tg.ready?.();
       tg.expand?.();
       try {
-        tg.setHeaderColor?.('#581c87');
-        tg.setBackgroundColor?.('#f1f5f9');
+        tg.disableVerticalSwipes?.();
+        tg.setHeaderColor?.('#0f172a');
+        tg.setBackgroundColor?.('#0f172a');
       } catch {}
       tg.enableClosingConfirmation?.();
       const u = tg.initDataUnsafe?.user;
@@ -80,6 +81,63 @@ function getInitialTelegramUser() {
     }
   } catch {}
   return null;
+}
+
+function extractTelegramStartParam(): string | null {
+  try {
+    const tg = typeof window !== 'undefined' ? (window as any).Telegram?.WebApp : null;
+    if (tg?.initDataUnsafe?.start_param) {
+      return String(tg.initDataUnsafe.start_param);
+    }
+    const urlParams = new URLSearchParams(window.location.search);
+    const fromSearch =
+      urlParams.get('tgWebAppStartParam') ||
+      urlParams.get('startapp') ||
+      urlParams.get('start_param') ||
+      urlParams.get('video');
+    if (fromSearch) return fromSearch;
+
+    if (window.location.hash) {
+      const hashContent = window.location.hash.startsWith('#')
+        ? window.location.hash.slice(1)
+        : window.location.hash;
+      const hashParams = new URLSearchParams(hashContent);
+      const fromHash =
+        hashParams.get('tgWebAppStartParam') ||
+        hashParams.get('startapp') ||
+        hashParams.get('start_param') ||
+        hashParams.get('video');
+      if (fromHash) return fromHash;
+    }
+  } catch {}
+  return null;
+}
+
+function matchAdLockedVideo(vids: any[], param: string): any | null {
+  if (!Array.isArray(vids) || vids.length === 0 || !param) return null;
+  const clean = decodeURIComponent(param).trim();
+  const stripped = clean.replace(/^video_/, '').replace(/^vid_/, '').trim();
+
+  // 1. Direct ID match
+  let found = vids.find((v) => v.id === clean || v.id === stripped);
+  if (found) return found;
+
+  // 2. Partial ID match
+  found = vids.find((v) => v.id.includes(stripped) || stripped.includes(v.id));
+  if (found) return found;
+
+  // 3. Number index (e.g. 1 -> 1st video, 2 -> 2nd video)
+  const num = parseInt(stripped, 10);
+  if (!isNaN(num) && num >= 1 && num <= vids.length) {
+    return vids[num - 1];
+  }
+
+  // 4. Title match
+  found = vids.find((v) => v.title && v.title.toLowerCase().includes(stripped.toLowerCase()));
+  if (found) return found;
+
+  // 5. Default to the latest active video if parameter exists
+  return vids[0] || null;
 }
 
 function getLocalOrNewUserId(): string {
@@ -270,17 +328,10 @@ export default function App() {
       })
       .catch(() => {});
 
-    // Initialize Adsterra Popunder for general users (strictly suppressed if admin)
-    initAdsterraPopunder();
-
-    // Initialize Monetag In-App Interstitial for regular users after 2 minutes (recurring every 2 minutes)
+    // Initialize Monetag In-App Interstitial after 2 minutes (smooth non-blocking)
     const adTimer = setTimeout(() => {
       initMonetagInAppAds();
     }, 2 * 60 * 1000); // 2 minutes delay
-
-    const recurringAdInterval = setInterval(() => {
-      initMonetagInAppAds();
-    }, 2 * 60 * 1000); // every 2 minutes
 
     // 90-minute expired video auto-delete verification ping (ensures deletion is always on time)
     const deleteCheckInterval = setInterval(() => {
@@ -290,37 +341,43 @@ export default function App() {
 
     return () => {
       clearTimeout(adTimer);
-      clearInterval(recurringAdInterval);
       clearInterval(deleteCheckInterval);
     };
   }, []);
 
   // Handle Telegram startapp deep links (e.g. video_lock-vid-1 from channel 'Watch Full Video' button)
   React.useEffect(() => {
-    try {
-      const tg = (window as any).Telegram?.WebApp;
-      const urlParams = new URLSearchParams(window.location.search);
-      const startParam =
-        tg?.initDataUnsafe?.start_param ||
-        urlParams.get('tgWebAppStartParam') ||
-        urlParams.get('startapp') ||
-        urlParams.get('video');
+    let isMounted = true;
+    const checkAndOpenDeepLink = () => {
+      const startParam = extractTelegramStartParam();
+      if (!startParam) return;
 
-      if (startParam) {
-        const vidId = startParam.startsWith('video_') ? startParam.replace('video_', '') : startParam;
-        fetch('/api/ad-videos')
-          .then((res) => res.json())
-          .then((vids) => {
-            if (Array.isArray(vids)) {
-              const matched = vids.find((v) => v.id === vidId || v.id === startParam);
-              if (matched) {
-                setActiveAdLockedVideo(matched);
-              }
-            }
-          })
-          .catch(() => {});
-      }
-    } catch {}
+      fetch('/api/ad-videos')
+        .then((res) => res.json())
+        .then((vids) => {
+          if (!isMounted || !Array.isArray(vids)) return;
+          const matched = matchAdLockedVideo(vids, startParam);
+          if (matched) {
+            console.log('[DeepLink] Matched video from startapp:', matched.title);
+            setActiveAdLockedVideo(matched);
+            setActiveTab('home');
+          }
+        })
+        .catch(() => {});
+    };
+
+    // Execute immediately and with short intervals in case Telegram initDataUnsafe populates asynchronously
+    checkAndOpenDeepLink();
+    const t1 = setTimeout(checkAndOpenDeepLink, 200);
+    const t2 = setTimeout(checkAndOpenDeepLink, 700);
+    const t3 = setTimeout(checkAndOpenDeepLink, 1500);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
   }, []);
 
   // Load user data and videos from server on mount

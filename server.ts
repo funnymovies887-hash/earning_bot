@@ -2032,16 +2032,153 @@ async function startServer() {
     });
   });
 
-  // Admin API: Update Withdrawal status
-  app.post("/api/admin/withdrawals/update", (req, res) => {
+  // Admin API: Update Withdrawal status & Broadcast Payment Proof
+  app.post("/api/admin/withdrawals/update", async (req, res) => {
     const { id, status } = req.body;
     const item = withdrawals.find((w) => w.id === id);
-    if (item) {
-      item.status = status;
-      saveJsonFile("withdrawals.json", withdrawals);
-      return res.json({ success: true, item });
+    if (!item) {
+      return res.status(404).json({ error: "Withdrawal not found" });
     }
-    res.status(404).json({ error: "Withdrawal not found" });
+
+    item.status = status;
+    saveJsonFile("withdrawals.json", withdrawals);
+
+    if (status === "Approved") {
+      const bdtAmount = item.currency === 'BDT' ? Number(item.amount) : Math.round(Number(item.amount) * 120);
+      const usdAmount = item.currency === 'USD' ? Number(item.amount) : +(Number(item.amount) / 120).toFixed(2);
+      const trxId = "TXN" + Date.now().toString().slice(-8);
+      const timeDhaka = new Date().toLocaleString("en-US", { timeZone: "Asia/Dhaka" });
+
+      // Clean privacy masking for user name and account number
+      const rawName = (item.userName || "User").trim();
+      const maskedName = rawName.length > 4 
+        ? rawName.slice(0, 3) + "***" + (rawName.length > 6 ? rawName.slice(-2) : "") 
+        : rawName + "***";
+      const rawAccount = (item.accountNumber || "017********").trim();
+      const maskedAccount = rawAccount.length > 6 
+        ? rawAccount.slice(0, 4) + "****" + rawAccount.slice(-3) 
+        : rawAccount;
+
+      // 1. Immediately prepend to livePayouts stream for all Mini App users
+      const newLivePayout = {
+        id: "payout-" + Date.now(),
+        userName: maskedName,
+        amount: `৳ ${bdtAmount}`,
+        method: item.method || 'bKash',
+        timeAgo: 'এইমাত্র',
+        status: 'Success',
+        trxId,
+        timestamp: Date.now(),
+      };
+      livePayouts.unshift(newLivePayout);
+      livePayouts = livePayouts.slice(0, 30);
+
+      // 2. Personal notification for the user inside Mini App
+      const recipientUser = usersMap[item.userId];
+      if (recipientUser) {
+        recipientUser.personalNotifications = recipientUser.personalNotifications || [];
+        recipientUser.personalNotifications.unshift({
+          id: "proof_" + Date.now(),
+          type: "bonus",
+          title: "🎉 উইথড্র পেমেন্ট সফলভাবে প্রদান করা হয়েছে!",
+          message: `অভিনন্দন! আপনার ৳${bdtAmount} টাকার (${item.method}) উইথড্র রিকোয়েস্ট অনুমোদিত হয়েছে এবং টাকা পাঠানো হয়েছে। TrxID: ${trxId}।`,
+          createdAt: new Date().toISOString(),
+          isRead: false,
+          sentBy: "Admin",
+          sentToTelegram: true,
+        });
+        saveJsonFile("users.json", usersMap);
+      }
+
+      // 3. Send Telegram Payment Proof Message to Official Channels with "Open App" button!
+      const botToken = telegramConfig.botToken || process.env.TELEGRAM_BOT_TOKEN;
+      const botHandle = (telegramConfig.botUsername || "CholoIncomeKoriBot").replace("@", "");
+      const miniAppUrl = `https://t.me/${botHandle}/app`;
+
+      const paymentProofHtml =
+        `🎉 <b>পেমেন্ট সফলভাবে সম্পন্ন হয়েছে! (Payment Proof)</b>\n\n` +
+        `👤 <b>ব্যবহারকারী:</b> <b>${escapeTgHtml(maskedName)}</b>\n` +
+        `💳 <b>পেমেন্ট মেথড:</b> <b>${escapeTgHtml(item.method || 'bKash')}</b>\n` +
+        `📱 <b>অ্যাকাউন্ট:</b> <code>${escapeTgHtml(maskedAccount)}</code>\n` +
+        `💰 <b>উত্তোলনের পরিমাণ:</b> <b>৳ ${bdtAmount} টাকা</b> ($${usdAmount})\n` +
+        `⚡ <b>স্ট্যাটাস:</b> ✅ Approved & Paid (সফল)\n` +
+        `🧾 <b>ট্রানজেকশন আইডি:</b> <code>${trxId}</code>\n` +
+        `⏰ <b>সময়:</b> ${timeDhaka}\n\n` +
+        `🚀 <i>প্রতিদিন ১০০% নিশ্চিত পেমেন্ট পেতে এখনই আমাদের মিনি অ্যাপে প্রবেশ করে কাজ শুরু করুন!</i>`;
+
+      const inlineKeyboard = {
+        inline_keyboard: [
+          [
+            {
+              text: "🚀 Open App (টাকা আয় শুরু করুন)",
+              url: miniAppUrl,
+            },
+          ],
+        ],
+      };
+
+      if (botToken) {
+        // Broadcast payment proof to all official channels
+        const channels = [
+          telegramConfig.channel1Handle || "@CholoIncomeKori",
+          telegramConfig.channel2Handle || "@IncomeBD_Online",
+        ].filter(Boolean);
+
+        for (const ch of channels) {
+          try {
+            const targetChat = formatTelegramChatTarget(ch);
+            await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                chat_id: targetChat,
+                text: paymentProofHtml,
+                parse_mode: "HTML",
+                reply_markup: inlineKeyboard,
+              }),
+            });
+            console.log(`[PaymentProof] Broadcasted to channel ${targetChat}`);
+          } catch (chErr: any) {
+            console.warn(`[PaymentProof] Channel error ${ch}:`, chErr.message);
+          }
+        }
+
+        // Also send directly to user's Telegram inbox above Open App if userId is numeric:
+        if (item.userId && /^\d+$/.test(item.userId)) {
+          try {
+            await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                chat_id: item.userId,
+                text:
+                  `🎉 <b>উইথড্র পেমেন্ট সফলভাবে প্রদান করা হয়েছে!</b>\n\n` +
+                  `প্রিয় সদস্য, আপনার <b>৳ ${bdtAmount} টাকা</b> (${item.method}) উইথড্র সফলভাবে অনুমোদিত হয়েছে ও টাকা পাঠানো হয়েছে।\n\n` +
+                  `🧾 TrxID: <code>${trxId}</code>\n` +
+                  `⏰ সময়: ${timeDhaka}\n\n` +
+                  `টেলিগ্রাম চ্যাটে "Open App" বাটনে চাপ দিয়ে যেকোনো সময় আবার আয় করুন!`,
+                parse_mode: "HTML",
+                reply_markup: inlineKeyboard,
+              }),
+            });
+            console.log(`[PaymentProof] Sent direct confirmation to user ${item.userId}`);
+          } catch (uErr: any) {
+            console.warn(`[PaymentProof] Direct user error:`, uErr.message);
+          }
+        }
+      }
+
+      // Also trigger GitHub push so the approved withdrawal and live payout state is backed up!
+      if (githubSyncConfig.token) {
+        pushFileToGitHubDirect(
+          "data/withdrawals.json",
+          JSON.stringify(withdrawals, null, 2),
+          `Payment Approved for ${maskedName} - ৳${bdtAmount}`
+        ).catch(() => {});
+      }
+    }
+
+    return res.json({ success: true, item, livePayouts });
   });
 
   // Admin API: Delete Withdrawal record
@@ -2859,8 +2996,8 @@ async function startServer() {
       return res.status(400).json({ error: "টার্গেট টেলিগ্রাম চ্যানেল হ্যান্ডেল বা আইডি পাওয়া যায়নি।" });
     }
 
-    const botUsername = (telegramConfig.botUsername || "choloincome_bot").replace("@", "");
-    const miniAppDeepLink = `https://t.me/${botUsername}?startapp=video_${vid.id}`;
+    const botUsername = (telegramConfig.botUsername || "CholoIncomeKoriBot").replace("@", "");
+    const miniAppDeepLink = `https://t.me/${botUsername}/app?startapp=video_${vid.id}`;
 
     const caption = `🎥 **${vid.title}** (ফ্রি ডেমো ভিডিও)\n\n${vid.description}\n\n⏱️ ডেমো দৈর্ঘ্য: ${vid.previewDuration} | ফুল ভিডিও: ${vid.fullDuration}\n✨ ${vid.requiredAds}টি স্পন্সর বিজ্ঞাপন দেখলেই সম্পূর্ণ ফুল ভিডিওটি ৯০ মিনিটের জন্য আনলক হবে!\n\n👇 সম্পূর্ণ ভিডিও দেখতে নিচের বাটনে ক্লিক করুন:`;
 
@@ -3043,8 +3180,17 @@ async function startServer() {
     // Button 2: “🚀 Watch Full Video (Watch Now)”
     // Button 3: “💡 How to watch videos? (Tutorial)”
     const buttons: any[] = [];
+    const botUser = (telegramConfig.botUsername || "CholoIncomeKoriBot").replace("@", "");
+    let cleanFullUrl = (fullVideoUrl && fullVideoUrl.trim()) ? fullVideoUrl.trim() : "";
+    if (cleanFullUrl) {
+      if (cleanFullUrl.startsWith("video_") || cleanFullUrl.startsWith("lock-vid-") || /^\d+$/.test(cleanFullUrl)) {
+        cleanFullUrl = `https://t.me/${botUser}/app?startapp=${cleanFullUrl.startsWith("video_") ? cleanFullUrl : "video_" + cleanFullUrl}`;
+      } else if (cleanFullUrl.includes("t.me/") && !cleanFullUrl.includes("/app")) {
+        cleanFullUrl = cleanFullUrl.replace(/t\.me\/([^\/\?]+)(\?startapp=.*)/, 't.me/$1/app$2');
+      }
+    }
+    const validFullUrl = cleanFullUrl || `https://t.me/${botUser}/app`;
     const validDemoUrl = (demoUrl && demoUrl.trim()) ? demoUrl.trim() : "https://t.me/demovideos24";
-    const validFullUrl = (fullVideoUrl && fullVideoUrl.trim()) ? fullVideoUrl.trim() : `https://t.me/${(telegramConfig.botUsername || "CholoIncomeKoriBot").replace("@", "")}`;
     const validTutUrl = (tutorialUrl && tutorialUrl.trim()) ? tutorialUrl.trim() : "https://t.me/CholoIncomeKori";
 
     buttons.push([{ text: "👀 Watch Demo", url: validDemoUrl }]);

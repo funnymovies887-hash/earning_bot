@@ -192,28 +192,10 @@
       })();
     </script>
     <!-- Monetag Telegram Mini App Ads SDK (Zone 11898539) -->
-    <script src="//libtl.com/sdk.js" data-zone="11898539" data-sdk="show_11898539"></script>
-    <!-- Adsterra Popunder Ads Script (Zone dabdcb221f24811589a079216d6d2fe7) -->
-    <script>
-      (function() {
-        try {
-          if (
-            window.location.hash.indexOf('admin') === -1 &&
-            window.location.pathname.indexOf('admin') === -1 &&
-            localStorage.getItem('admin_auth') !== 'true'
-          ) {
-            var s = document.createElement('script');
-            s.type = 'text/javascript';
-            s.src = "https://researchingsweatexit.com/da/bd/cb/dabdcb221f24811589a079216d6d2fe7.js";
-            s.async = true;
-            document.head.appendChild(s);
-          }
-        } catch(e) {}
-      })();
-    </script>
+    <script src="//libtl.com/sdk.js" data-zone="11898539" data-sdk="show_11898539" async></script>
   </head>
-  <body class="bg-slate-900 text-slate-900 antialiased selection:bg-purple-500 selection:text-white min-h-screen">
-    <div id="root" class="min-h-screen flex flex-col"></div>
+  <body class="bg-slate-900 text-white antialiased selection:bg-purple-500 selection:text-white min-h-screen overflow-x-hidden">
+    <div id="root" class="min-h-screen flex flex-col bg-slate-900"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

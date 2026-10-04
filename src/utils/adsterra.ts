@@ -69,16 +69,8 @@ export function triggerAdsterraPopunder() {
     const win = window as any;
     if (typeof win.adsterraPopunderTrigger === 'function') {
       win.adsterraPopunderTrigger();
-    } else {
-      // Simulate synthetic user click if Adsterra attached a document click listener
-      const clickEvent = new MouseEvent('click', {
-        view: window,
-        bubbles: true,
-        cancelable: true,
-      });
-      document.dispatchEvent(clickEvent);
     }
   } catch (e) {
-    // Ignore synthetic trigger errors
+    // Ignore trigger notice
   }
 }

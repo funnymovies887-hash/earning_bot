@@ -67,6 +67,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({
 
   // Ad-locked videos state
   const [adLockedVideos, setAdLockedVideos] = React.useState<AdLockedVideo[]>([]);
+  const [livePayouts, setLivePayouts] = React.useState<any[]>([]);
+  const [activePayoutIndex, setActivePayoutIndex] = React.useState<number>(0);
 
   React.useEffect(() => {
     fetch(`/api/ad-videos?userId=${user.id}`)
@@ -75,7 +77,22 @@ export const HomeTab: React.FC<HomeTabProps> = ({
         if (Array.isArray(data)) setAdLockedVideos(data);
       })
       .catch(() => {});
+
+    fetch('/api/live-payouts')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) setLivePayouts(data);
+      })
+      .catch(() => {});
   }, [user.id]);
+
+  React.useEffect(() => {
+    if (livePayouts.length <= 1) return;
+    const interval = setInterval(() => {
+      setActivePayoutIndex((prev) => (prev + 1) % livePayouts.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [livePayouts.length]);
 
   // Currency formatted balance with localized digits
   const formatBalance = () => {
@@ -183,6 +200,29 @@ export const HomeTab: React.FC<HomeTabProps> = ({
           </span>
         </button>
       </div>
+
+      {/* Live Payment Proof Verified Ticker (সব ইউজারদের জন্য লাইভ প্রমাণ) */}
+      {livePayouts.length > 0 && (
+        <div
+          onClick={() => onTabChange('profile')}
+          className="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 border border-emerald-500/40 rounded-2xl p-2.5 px-3.5 shadow-md flex items-center justify-between gap-2.5 cursor-pointer hover:border-emerald-400 transition-all text-xs text-white active:scale-99"
+          title="সকল লাইভ পেমেন্ট প্রুফ দেখুন"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
+            <span className="text-[10px] font-black uppercase text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full shrink-0">
+              পেমেন্ট প্রুফ
+            </span>
+            <div className="truncate text-slate-200 text-[11px]">
+              <strong className="text-white font-extrabold">{livePayouts[activePayoutIndex]?.userName}</strong> কে{' '}
+              <span className="text-amber-300 font-black">{livePayouts[activePayoutIndex]?.amount}</span> ({livePayouts[activePayoutIndex]?.method}) পরিশোধ হয়েছে
+            </div>
+          </div>
+          <span className="text-[9px] font-bold text-emerald-300 bg-emerald-900/60 px-1.5 py-0.5 rounded shrink-0 border border-emerald-500/30">
+            ✅ Verified
+          </span>
+        </div>
+      )}
 
       {/* 4 Quick Action Circular Buttons */}
       <div className="grid grid-cols-4 gap-2.5 px-1">
