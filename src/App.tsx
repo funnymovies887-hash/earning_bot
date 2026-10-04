@@ -60,7 +60,6 @@ function getInitialTelegramUser() {
       tg.ready?.();
       tg.expand?.();
       try {
-        tg.disableVerticalSwipes?.();
         tg.setHeaderColor?.('#0f172a');
         tg.setBackgroundColor?.('#0f172a');
       } catch {}
@@ -658,10 +657,16 @@ export default function App() {
     });
   };
 
-  // Splash complete -> open Welcome Modal (always enforces verification on every app visit)
+  // Splash complete -> open Welcome Modal only for unverified new sessions without deep-link
   const handleSplashComplete = () => {
     setShowSplash(false);
-    setShowWelcome(true);
+    const hasDeepLink = extractTelegramStartParam();
+    const alreadyVisited =
+      sessionStorage.getItem('tg_channel_visited_session') === 'true' ||
+      localStorage.getItem('tg_channel_verified_user') === 'true';
+    if (!hasDeepLink && !alreadyVisited) {
+      setShowWelcome(true);
+    }
   };
 
   // Tab change handler - fast responsive tab navigation

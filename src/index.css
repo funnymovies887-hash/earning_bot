@@ -4,29 +4,23 @@
   html {
     background-color: #0f172a !important;
     color: #ffffff;
-    overscroll-behavior-y: none !important;
-    overscroll-behavior-x: none !important;
-    overscroll-behavior: none !important;
+    min-height: 100%;
+    width: 100%;
     -webkit-overflow-scrolling: touch;
-    height: 100%;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
+    margin: 0;
+    padding: 0;
     background-color: #0f172a !important;
     color: #ffffff;
     font-family: 'Plus Jakarta Sans', 'Hind Siliguri', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    -webkit-tap-highlight-color: transparent !important;
-    -webkit-touch-callout: none !important;
-    user-select: none;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    overscroll-behavior-y: none !important;
-    overscroll-behavior-x: none !important;
-    overscroll-behavior: none !important;
-    touch-action: pan-y;
     min-height: 100%;
     width: 100%;
-    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   #root {
@@ -35,7 +29,6 @@
     display: flex;
     flex-direction: column;
     background-color: #0f172a !important;
-    overflow-x: hidden;
   }
 }
 
