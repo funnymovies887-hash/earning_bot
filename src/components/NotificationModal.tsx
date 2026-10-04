@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Crown, Send, CheckCircle2, Loader2, AlertCircle, ShieldCheck, UserX, AlertTriangle, X } from 'lucide-react';
+import { Crown, Send, CheckCircle2, Loader2, AlertCircle, ShieldCheck, UserX, AlertTriangle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 import { Language, UserProfile } from '../types';
@@ -156,10 +156,6 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, on
   };
 
   const handleFinish = () => {
-    try {
-      sessionStorage.setItem('tg_channel_visited_session', 'true');
-      localStorage.setItem('tg_channel_verified_user', 'true');
-    } catch {}
     onClose();
   };
 
@@ -177,16 +173,6 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, on
           id="welcome-notification-modal"
           className="w-full max-w-sm bg-gradient-to-b from-amber-400 via-amber-300 to-yellow-200 rounded-3xl p-5 text-slate-900 shadow-2xl relative overflow-hidden border-2 border-yellow-200 cursor-default max-h-[92vh] overflow-y-auto"
         >
-          {/* Close button so users are never trapped and can freely browse and scroll the app */}
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-black/10 hover:bg-black/20 text-slate-800 flex items-center justify-center transition-colors cursor-pointer z-10"
-            title="বন্ধ করুন"
-          >
-            <X className="w-5 h-5" />
-          </button>
-
           {/* Crown badge matching screenshot */}
           <div className="flex justify-center -mt-1 mb-2">
             <div className="w-16 h-16 rounded-full bg-white/95 shadow-lg flex items-center justify-center border-2 border-amber-300">

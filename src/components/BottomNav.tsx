@@ -44,7 +44,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, la
             >
               {/* Highlight circle icon for active state */}
               {isActive ? (
-                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-rose-600 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-rose-600/40 -mt-3.5 border-2 border-white mb-0.5 animate-pulse-gentle pointer-events-none">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-rose-600 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-rose-600/40 -mt-3.5 border-2 border-white mb-0.5 pointer-events-none transform-gpu">
                   <Icon className="w-5 h-5" />
                 </div>
               ) : (

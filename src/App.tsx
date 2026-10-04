@@ -657,14 +657,11 @@ export default function App() {
     });
   };
 
-  // Splash complete -> open Welcome Modal only for unverified new sessions without deep-link
+  // Splash complete -> open Welcome Modal (mandatory channel verification)
   const handleSplashComplete = () => {
     setShowSplash(false);
     const hasDeepLink = extractTelegramStartParam();
-    const alreadyVisited =
-      sessionStorage.getItem('tg_channel_visited_session') === 'true' ||
-      localStorage.getItem('tg_channel_verified_user') === 'true';
-    if (!hasDeepLink && !alreadyVisited) {
+    if (!hasDeepLink) {
       setShowWelcome(true);
     }
   };

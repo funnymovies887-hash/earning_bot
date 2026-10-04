@@ -25,7 +25,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenStore,
 }) => {
   return (
-    <header className="sticky top-0 z-40 bg-gradient-to-r from-purple-800 via-indigo-800 to-purple-900 text-white px-3 py-2.5 shadow-md">
+    <header className="sticky top-0 z-40 bg-gradient-to-r from-purple-800 via-indigo-800 to-purple-900 text-white px-3 py-2.5 shadow-md transform-gpu">
       {/* Main app bar */}
       <div className="flex items-center justify-between gap-1">
         {/* User avatar */}
