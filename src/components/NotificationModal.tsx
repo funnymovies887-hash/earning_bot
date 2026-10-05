@@ -228,10 +228,10 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, on
                 onClick={handleJoinChannel1}
                 className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-transform active:scale-95 cursor-pointer shadow-xs shrink-0 flex items-center gap-1 ${
                   channel1Left
-                    ? 'bg-rose-600 hover:bg-rose-700 text-white animate-bounce'
+                    ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-md shadow-rose-600/30'
                     : channel1Visited
                     ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white animate-pulse'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/30'
                 }`}
               >
                 {channel1Left ? 'পুনরায় Join করুন' : channel1Visited ? 'Joined ✅' : 'Join'}
@@ -252,7 +252,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, on
                   <div className="flex items-center gap-1">
                     <span className="text-xs font-bold text-slate-800 block truncate">২য় চ্যানেল</span>
                     {channel2Left && (
-                      <span className="text-[9px] font-black bg-rose-600 text-white px-1.5 py-0.2 rounded-md animate-pulse">
+                      <span className="text-[9px] font-black bg-rose-600 text-white px-1.5 py-0.5 rounded-md">
                         লিভ নিয়েছেন!
                       </span>
                     )}
@@ -266,10 +266,10 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, on
                 onClick={handleJoinChannel2}
                 className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-transform active:scale-95 cursor-pointer shadow-xs shrink-0 flex items-center gap-1 ${
                   channel2Left
-                    ? 'bg-rose-600 hover:bg-rose-700 text-white animate-bounce'
+                    ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-md shadow-rose-600/30'
                     : channel2Visited
                     ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white animate-pulse'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/30'
                 }`}
               >
                 {channel2Left ? 'পুনরায় Join করুন' : channel2Visited ? 'Joined ✅' : 'Join'}
@@ -320,7 +320,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, on
               type="button"
               id="ok-understood-btn"
               onClick={handleFinish}
-              className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-black rounded-2xl shadow-lg flex items-center justify-center gap-2 transition-all active:scale-98 text-sm cursor-pointer animate-pulse"
+              className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-black rounded-2xl shadow-lg shadow-emerald-900/30 flex items-center justify-center gap-2 transition-all active:scale-98 text-sm cursor-pointer"
             >
               <CheckCircle2 className="w-4 h-4 text-white" />
               ✅ সফল হয়েছে! অ্যাপে প্রবেশ করুন

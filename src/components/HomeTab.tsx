@@ -68,7 +68,6 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   // Ad-locked videos state
   const [adLockedVideos, setAdLockedVideos] = React.useState<AdLockedVideo[]>([]);
   const [livePayouts, setLivePayouts] = React.useState<any[]>([]);
-  const [activePayoutIndex, setActivePayoutIndex] = React.useState<number>(0);
 
   React.useEffect(() => {
     fetch(`/api/ad-videos?userId=${user.id}`)
@@ -86,16 +85,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({
       .catch(() => {});
   }, [user.id]);
 
-  React.useEffect(() => {
-    if (livePayouts.length <= 1) return;
-    const interval = setInterval(() => {
-      setActivePayoutIndex((prev) => (prev + 1) % livePayouts.length);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [livePayouts.length]);
-
-  // Currency formatted balance with localized digits
-  const formatBalance = () => {
+  // Currency formatted balance with localized digits (memoized for 60fps performance)
+  const balanceInfo = React.useMemo(() => {
     const bUsd = Number(user.balanceUsd) || 0;
     let rawStr = '0.00';
     let symbol = '৳';
@@ -120,9 +111,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
       amount: toLocalizedDigits(rawStr, language),
       code,
     };
-  };
-
-  const balanceInfo = formatBalance();
+  }, [user.balanceUsd, user.currency, language]);
 
   const scrollSubCategories = (direction: 'left' | 'right') => {
     if (subCategoryScrollRef.current) {
@@ -131,14 +120,16 @@ export const HomeTab: React.FC<HomeTabProps> = ({
     }
   };
 
-  // Filter videos
-  const filteredVideos = videos.filter((v) => {
-    if (v.category !== selectedCategory) return false;
-    if (selectedSubCategory !== 'All Videos' && v.subCategory !== selectedSubCategory) {
-      return false;
-    }
-    return true;
-  });
+  // Filter videos (memoized to prevent re-filtering on scroll)
+  const filteredVideos = React.useMemo(() => {
+    return videos.filter((v) => {
+      if (v.category !== selectedCategory) return false;
+      if (selectedSubCategory !== 'All Videos' && v.subCategory !== selectedSubCategory) {
+        return false;
+      }
+      return true;
+    });
+  }, [videos, selectedCategory, selectedSubCategory]);
 
   return (
     <div id="home-tab-content" className="space-y-4 pb-20 pt-2">
@@ -187,9 +178,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({
         <button
           id="balance-card-withdraw-btn"
           onClick={onOpenWithdraw}
-          className="w-full py-2 px-3.5 bg-purple-900/60 hover:bg-purple-900/80 border border-purple-400/40 rounded-full text-xs font-semibold text-purple-100 flex items-center justify-center gap-1.5 transition-all active:scale-98"
+          className="w-full py-2 px-3.5 bg-purple-900/60 hover:bg-purple-900/80 border border-purple-400/40 rounded-full text-xs font-semibold text-purple-100 flex items-center justify-center gap-1.5 transition-all active:scale-98 cursor-pointer"
         >
-          <Bell className="w-3.5 h-3.5 text-amber-400 animate-bounce" />
+          <Bell className="w-3.5 h-3.5 text-amber-400" />
           <span>
             {t.withdrawReminder}{' '}
             {user.currency === 'USD'
@@ -201,66 +192,11 @@ export const HomeTab: React.FC<HomeTabProps> = ({
         </button>
       </div>
 
-      {/* Real Live Payment Proof Post Banner (সব ইউজারদের জন্য পোস্টের মতো দৃশ্যমান আসল পেমেন্ট প্রমাণ) */}
-      {livePayouts.length > 0 && livePayouts[activePayoutIndex] && (
-        <div
-          onClick={() => onTabChange('profile')}
-          className="bg-gradient-to-br from-emerald-950/90 via-slate-900 to-slate-950 border border-emerald-500/50 rounded-2xl p-3.5 shadow-lg space-y-2 cursor-pointer hover:border-emerald-400 transition-all text-white active:scale-[0.99] relative overflow-hidden"
-          title="সকল লাইভ পেমেন্ট প্রুফ দেখুন"
-        >
-          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl pointer-events-none" />
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span className="text-[11px] font-black uppercase text-emerald-400 tracking-wider flex items-center gap-1">
-                📢 পেমেন্ট প্রুফ পোস্ট • {livePayouts[activePayoutIndex]?.timeAgo || 'সফল'}
-              </span>
-            </div>
-            <span className="text-[10px] font-black text-emerald-300 bg-emerald-900/70 border border-emerald-500/40 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
-              <ShieldCheck className="w-3 h-3 text-emerald-400" />
-              <span>১০০% নিশ্চিত পেমেন্ট</span>
-            </span>
-          </div>
-
-          <div className="bg-slate-900/80 border border-emerald-500/30 rounded-xl p-2.5 flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-xs font-bold text-slate-200 truncate flex items-center gap-1.5">
-                <span>👤</span>
-                <strong className="text-white font-black">{livePayouts[activePayoutIndex]?.userName}</strong>
-                {livePayouts[activePayoutIndex]?.accountNumber && (
-                  <span className="text-[10px] text-slate-400 font-mono">({livePayouts[activePayoutIndex]?.accountNumber})</span>
-                )}
-              </div>
-              <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-2">
-                <span>মেথড: <b className="text-amber-300 font-bold">{livePayouts[activePayoutIndex]?.method}</b></span>
-                {livePayouts[activePayoutIndex]?.trxId && (
-                  <span>• TrxID: <code className="text-emerald-300 font-mono">{livePayouts[activePayoutIndex]?.trxId}</code></span>
-                )}
-              </div>
-            </div>
-            <div className="text-right shrink-0">
-              <div className="text-sm font-black text-emerald-400 drop-shadow-sm">
-                {livePayouts[activePayoutIndex]?.amount}
-              </div>
-              <span className="text-[9px] font-bold text-emerald-200 bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-600/40">
-                ✅ Paid & Approved
-              </span>
-            </div>
-          </div>
-
-          {livePayouts.length > 1 && (
-            <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5 px-0.5">
-              <span>মোট {toLocalizedDigits(livePayouts.length)}টি আসল উত্তোলন অনুমোদিত হয়েছে</span>
-              <span className="text-emerald-400 font-semibold flex items-center gap-0.5">
-                সবগুলো দেখতে ট্যাপ করুন <ChevronRight className="w-3 h-3" />
-              </span>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Real Live Payment Proof Post Banner (Isolated from main feed to prevent 4s stutter) */}
+      <LivePaymentProofTicker
+        livePayouts={livePayouts}
+        onOpenProfile={() => onTabChange('profile')}
+      />
 
       {/* 4 Quick Action Circular Buttons */}
       <div className="grid grid-cols-4 gap-2.5 px-1">
@@ -690,3 +626,81 @@ export const HomeTab: React.FC<HomeTabProps> = ({
     </div>
   );
 };
+
+// Isolated Live Payment Proof Ticker Component - guarantees 60fps scrolling and zero whole-page re-renders
+const LivePaymentProofTicker: React.FC<{
+  livePayouts: any[];
+  onOpenProfile: () => void;
+}> = React.memo(({ livePayouts, onOpenProfile }) => {
+  const [index, setIndex] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!livePayouts || livePayouts.length <= 1) return;
+    const timer = setInterval(() => {
+      setIndex((prev) => (prev + 1) % livePayouts.length);
+    }, 4500);
+    return () => clearInterval(timer);
+  }, [livePayouts]);
+
+  if (!livePayouts || livePayouts.length === 0 || !livePayouts[index]) return null;
+  const current = livePayouts[index];
+
+  return (
+    <div
+      onClick={onOpenProfile}
+      className="bg-gradient-to-br from-emerald-950/90 via-slate-900 to-slate-950 border border-emerald-500/50 rounded-2xl p-3.5 shadow-lg space-y-2 cursor-pointer hover:border-emerald-400 transition-all text-white active:scale-[0.99] relative overflow-hidden"
+      title="সকল লাইভ পেমেন্ট প্রুফ দেখুন"
+    >
+      <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl pointer-events-none" />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="relative flex h-2 w-2">
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+          </span>
+          <span className="text-[11px] font-black uppercase text-emerald-400 tracking-wider flex items-center gap-1">
+            📢 পেমেন্ট প্রুফ পোস্ট • {current?.timeAgo || 'সফল'}
+          </span>
+        </div>
+        <span className="text-[10px] font-black text-emerald-300 bg-emerald-900/70 border border-emerald-500/40 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
+          <ShieldCheck className="w-3 h-3 text-emerald-400" />
+          <span>১০০% নিশ্চিত পেমেন্ট</span>
+        </span>
+      </div>
+
+      <div className="bg-slate-900/80 border border-emerald-500/30 rounded-xl p-2.5 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs font-bold text-slate-200 truncate flex items-center gap-1.5">
+            <span>👤</span>
+            <strong className="text-white font-black">{current?.userName}</strong>
+            {current?.accountNumber && (
+              <span className="text-[10px] text-slate-400 font-mono">({current?.accountNumber})</span>
+            )}
+          </div>
+          <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-2">
+            <span>মেথড: <b className="text-amber-300 font-bold">{current?.method}</b></span>
+            {current?.trxId && (
+              <span>• TrxID: <code className="text-emerald-300 font-mono">{current?.trxId}</code></span>
+            )}
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-sm font-black text-emerald-400 drop-shadow-xs">
+            {current?.amount}
+          </div>
+          <span className="text-[9px] font-bold text-emerald-200 bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-600/40">
+            ✅ Paid & Approved
+          </span>
+        </div>
+      </div>
+
+      {livePayouts.length > 1 && (
+        <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5 px-0.5">
+          <span>মোট {toLocalizedDigits(livePayouts.length)}টি আসল উত্তোলন অনুমোদিত হয়েছে</span>
+          <span className="text-emerald-400 font-semibold flex items-center gap-0.5">
+            সবগুলো দেখতে ট্যাপ করুন <ChevronRight className="w-3 h-3" />
+          </span>
+        </div>
+      )}
+    </div>
+  );
+});

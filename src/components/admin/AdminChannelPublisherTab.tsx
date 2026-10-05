@@ -145,7 +145,7 @@ export const AdminChannelPublisherTab: React.FC = () => {
     if (vid.channelId) {
       setTargetChannel(vid.channelId);
     }
-    setFullVideoUrl(`https://t.me/CholoIncomeKoriBot/app?startapp=video_${vid.id}`);
+    setFullVideoUrl(`https://t.me/CholoIncomeKoriBot?startapp=video_${vid.id}`);
     setToast({
       type: 'info',
       title: 'ডাটা লোড হয়েছে',
@@ -169,7 +169,8 @@ export const AdminChannelPublisherTab: React.FC = () => {
     try {
       let finalFullVideoUrl = fullVideoUrl.trim();
       if (finalFullVideoUrl && !finalFullVideoUrl.startsWith('http://') && !finalFullVideoUrl.startsWith('https://')) {
-        finalFullVideoUrl = `https://t.me/CholoIncomeKoriBot/app?startapp=${finalFullVideoUrl.startsWith('video_') ? finalFullVideoUrl : 'video_' + finalFullVideoUrl}`;
+        const rawId = finalFullVideoUrl.startsWith('video_') ? finalFullVideoUrl.replace('video_', '') : finalFullVideoUrl;
+        finalFullVideoUrl = `https://t.me/CholoIncomeKoriBot?startapp=video_${rawId}`;
       }
 
       const res = await fetch('/api/admin/channel-publisher/publish', {

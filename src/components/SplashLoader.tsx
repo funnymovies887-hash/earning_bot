@@ -26,28 +26,30 @@ interface SplashLoaderProps {
 }
 
 export const SplashLoader: React.FC<SplashLoaderProps> = ({ onComplete }) => {
-  const [progress, setProgress] = React.useState(35);
+  const [progress, setProgress] = React.useState(25);
+  const onCompleteRef = React.useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   React.useEffect(() => {
     const timer = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
           clearInterval(timer);
-          setTimeout(onComplete, 80);
+          setTimeout(() => onCompleteRef.current(), 80);
           return 100;
         }
-        return prev + Math.floor(Math.random() * 25) + 30;
+        return Math.min(100, prev + 6);
       });
-    }, 45);
+    }, 55);
 
     return () => clearInterval(timer);
-  }, [onComplete]);
+  }, []);
 
   return (
     <div
       id="splash-screen"
-      onClick={onComplete}
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-b from-[#6b21a8] via-[#7e22ce] to-[#581c87] text-white px-6 cursor-pointer select-none"
+      onClick={() => onCompleteRef.current()}
+      className="fixed inset-0 z-[120] flex flex-col items-center justify-center bg-gradient-to-b from-[#6b21a8] via-[#7e22ce] to-[#581c87] text-white px-6 cursor-pointer select-none overscroll-none"
     >
       {/* Main glowing circular icon */}
       <motion.div

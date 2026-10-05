@@ -59,6 +59,8 @@ export const AdminStoreOrdersTab: React.FC = () => {
   const [pkgRequirements, setPkgRequirements] = useState('মোবাইল ও কম্পিউটার সাপোর্টেড');
   const [pkgPriceBdt, setPkgPriceBdt] = useState(450);
   const [pkgPriceUsd, setPkgPriceUsd] = useState(3.75);
+  const [pkgOriginalPriceBdt, setPkgOriginalPriceBdt] = useState<number | ''>('');
+  const [pkgDiscountBadge, setPkgDiscountBadge] = useState('');
   const [pkgThumbnail, setPkgThumbnail] = useState('https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=500&auto=format&fit=crop&q=60');
   const [pkgDownloadUrl, setPkgDownloadUrl] = useState('https://drive.google.com');
 
@@ -74,6 +76,8 @@ export const AdminStoreOrdersTab: React.FC = () => {
     setPkgRequirements('মোবাইল ও কম্পিউটার সাপোর্টেড');
     setPkgPriceBdt(450);
     setPkgPriceUsd(3.75);
+    setPkgOriginalPriceBdt('');
+    setPkgDiscountBadge('');
     setPkgThumbnail('https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=500&auto=format&fit=crop&q=60');
     setPkgDownloadUrl('https://drive.google.com');
     setIsPkgSaved(false);
@@ -248,6 +252,8 @@ export const AdminStoreOrdersTab: React.FC = () => {
           requirements: pkgRequirements.trim(),
           priceBdt: Number(pkgPriceBdt),
           priceUsd: Number(pkgPriceUsd),
+          originalPriceBdt: pkgOriginalPriceBdt ? Number(pkgOriginalPriceBdt) : undefined,
+          discountBadge: pkgDiscountBadge.trim(),
           thumbnail: pkgThumbnail.trim(),
           downloadUrl: pkgDownloadUrl.trim(),
         }),
@@ -310,6 +316,8 @@ export const AdminStoreOrdersTab: React.FC = () => {
           features: editingPackage.features,
           priceBdt: Number(editingPackage.priceBdt) || 450,
           priceUsd: Number(editingPackage.priceUsd) || 3.75,
+          originalPriceBdt: editingPackage.originalPriceBdt ? Number(editingPackage.originalPriceBdt) : undefined,
+          discountBadge: (editingPackage.discountBadge || '').trim(),
           thumbnail: editingPackage.thumbnail.trim(),
           downloadUrl: editingPackage.downloadUrl.trim(),
           hashtags: editingPackage.hashtags,
@@ -1150,6 +1158,37 @@ export const AdminStoreOrdersTab: React.FC = () => {
                 </div>
               </div>
 
+              {/* Special Offer & Discount Fields */}
+              <div className="grid grid-cols-2 gap-3 p-2.5 bg-amber-950/20 border border-amber-500/30 rounded-2xl">
+                <div>
+                  <label className="font-bold text-amber-300 block mb-1">🔥 আসল মূল্য (Original BDT):</label>
+                  <input
+                    type="number"
+                    step="1"
+                    placeholder="যেমন: 150 (কাটা দাগ দেখাবে)"
+                    value={pkgOriginalPriceBdt}
+                    onChange={(e) => setPkgOriginalPriceBdt(e.target.value ? parseFloat(e.target.value) : '')}
+                    className="w-full bg-slate-950 border border-amber-500/40 rounded-xl p-2 text-xs text-white font-bold focus:outline-none focus:border-amber-400"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    ইউজার দেখবে: <del>৳{pkgOriginalPriceBdt || 150}</del>
+                  </span>
+                </div>
+                <div>
+                  <label className="font-bold text-amber-300 block mb-1">⚡ অফার / ডিসকাউন্ট ব্যাজ:</label>
+                  <input
+                    type="text"
+                    placeholder="যেমন: ৫০% ছাড় 🔥 বা সীমিত অফার"
+                    value={pkgDiscountBadge}
+                    onChange={(e) => setPkgDiscountBadge(e.target.value)}
+                    className="w-full bg-slate-950 border border-amber-500/40 rounded-xl p-2 text-xs text-amber-200 font-bold focus:outline-none focus:border-amber-400"
+                  />
+                  <span className="text-[10px] text-amber-400 mt-0.5 block">
+                    প্যাকেজে রঙিন আকর্ষণীয় ব্যাজ দেখাবে
+                  </span>
+                </div>
+              </div>
+
               <div>
                 <label className="font-bold text-slate-300 block mb-1">বিবরণী (Description):</label>
                 <textarea
@@ -1354,6 +1393,43 @@ export const AdminStoreOrdersTab: React.FC = () => {
                       ≈ ৳{(editingPackage.priceUsd * 120).toFixed(0)} BDT
                     </span>
                   </div>
+                </div>
+              </div>
+
+              {/* Special Offer & Discount Fields for Edit */}
+              <div className="grid grid-cols-2 gap-3 p-2.5 bg-amber-950/20 border border-amber-500/30 rounded-2xl">
+                <div>
+                  <label className="font-bold text-amber-300 block mb-1">🔥 আসল মূল্য (Original BDT):</label>
+                  <input
+                    type="number"
+                    step="1"
+                    placeholder="যেমন: 150 (কাটা দাগ দেখাবে)"
+                    value={editingPackage.originalPriceBdt ?? ''}
+                    onChange={(e) => setEditingPackage({
+                      ...editingPackage,
+                      originalPriceBdt: e.target.value ? parseFloat(e.target.value) : undefined
+                    })}
+                    className="w-full bg-slate-950 border border-amber-500/40 rounded-xl p-2 text-xs text-white font-bold focus:outline-none focus:border-amber-400"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    ইউজার দেখবে: <del>৳{editingPackage.originalPriceBdt || 150}</del>
+                  </span>
+                </div>
+                <div>
+                  <label className="font-bold text-amber-300 block mb-1">⚡ অফার / ডিসকাউন্ট ব্যাজ:</label>
+                  <input
+                    type="text"
+                    placeholder="যেমন: ৫০% ছাড় 🔥 বা সীমিত অফার"
+                    value={editingPackage.discountBadge || ''}
+                    onChange={(e) => setEditingPackage({
+                      ...editingPackage,
+                      discountBadge: e.target.value
+                    })}
+                    className="w-full bg-slate-950 border border-amber-500/40 rounded-xl p-2 text-xs text-amber-200 font-bold focus:outline-none focus:border-amber-400"
+                  />
+                  <span className="text-[10px] text-amber-400 mt-0.5 block">
+                    প্যাকেজে রঙিন আকর্ষণীয় ব্যাজ দেখাবে
+                  </span>
                 </div>
               </div>
 

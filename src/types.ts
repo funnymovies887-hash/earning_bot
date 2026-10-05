@@ -210,6 +210,9 @@ export interface DigitalPackage {
   features: string[];
   priceBdt: number;
   priceUsd: number;
+  originalPriceBdt?: number;
+  discountBadge?: string;
+  isSpecialOffer?: boolean;
   thumbnail: string;
   downloadUrl: string; // Secret software/video link revealed upon approval
   previewUrl?: string;

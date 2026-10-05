@@ -407,10 +407,20 @@ export const DigitalStoreModal: React.FC<DigitalStoreModalProps> = ({
                               {pkg.title}
                             </h4>
 
-                            <div className="flex items-baseline gap-2 mt-1.5">
+                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                               <span className="text-lg font-black text-amber-300">
                                 ৳{pkg.priceBdt}
                               </span>
+                              {pkg.originalPriceBdt && pkg.originalPriceBdt > pkg.priceBdt && (
+                                <span className="text-xs line-through text-slate-400 font-bold">
+                                  ৳{pkg.originalPriceBdt}
+                                </span>
+                              )}
+                              {(pkg.discountBadge || (pkg.originalPriceBdt && pkg.originalPriceBdt > pkg.priceBdt)) && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-rose-500 to-amber-500 text-white shadow-xs">
+                                  {pkg.discountBadge || `${Math.round(((pkg.originalPriceBdt! - pkg.priceBdt) / pkg.originalPriceBdt!) * 100)}% ছাড় 🔥`}
+                                </span>
+                              )}
                               <span className="text-xs font-semibold text-slate-400">
                                 (${pkg.priceUsd.toFixed(2)} USD)
                               </span>
@@ -610,6 +620,35 @@ export const DigitalStoreModal: React.FC<DigitalStoreModalProps> = ({
                   </div>
                 </div>
 
+                {/* Special Offer / Discount Banner if present */}
+                {(selectedDetailPkg.discountBadge || (selectedDetailPkg.originalPriceBdt && selectedDetailPkg.originalPriceBdt > selectedDetailPkg.priceBdt)) && (
+                  <div className="bg-gradient-to-r from-rose-950/60 via-amber-950/50 to-orange-950/60 border border-amber-500/50 rounded-2xl p-3 flex items-center justify-between gap-3 shadow-md">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-500 to-amber-500 flex items-center justify-center text-white shrink-0 shadow-sm">
+                        <Sparkles className="w-5 h-5 text-amber-100" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-black text-amber-300">
+                            {selectedDetailPkg.discountBadge || 'সীমিত সময়ের ধামাকা অফার!'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-300">
+                          আসল মূল্য ৳{selectedDetailPkg.originalPriceBdt || selectedDetailPkg.priceBdt * 2} এর বদলে মাত্র ৳{selectedDetailPkg.priceBdt} টাকা!
+                        </p>
+                      </div>
+                    </div>
+                    {selectedDetailPkg.originalPriceBdt && selectedDetailPkg.originalPriceBdt > selectedDetailPkg.priceBdt && (
+                      <div className="text-right shrink-0">
+                        <span className="text-[10px] font-bold text-slate-400 block">সাশ্রয়</span>
+                        <span className="text-xs font-black text-emerald-400">
+                          ৳{selectedDetailPkg.originalPriceBdt - selectedDetailPkg.priceBdt} 💰
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Title and Category */}
                 <div>
                   <h3 className="text-base sm:text-lg font-black text-white leading-tight">
@@ -750,10 +789,15 @@ export const DigitalStoreModal: React.FC<DigitalStoreModalProps> = ({
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <span className="text-[10px] text-slate-400 block font-bold">প্যাকেজের মূল্য:</span>
-                      <div className="flex items-baseline gap-1.5">
+                      <div className="flex items-baseline gap-1.5 flex-wrap">
                         <span className="text-xl font-black text-amber-300">
                           ৳{selectedDetailPkg.priceBdt}
                         </span>
+                        {selectedDetailPkg.originalPriceBdt && selectedDetailPkg.originalPriceBdt > selectedDetailPkg.priceBdt && (
+                          <span className="text-xs line-through text-slate-400 font-bold">
+                            ৳{selectedDetailPkg.originalPriceBdt}
+                          </span>
+                        )}
                         <span className="text-xs text-slate-400 font-semibold">
                           (${selectedDetailPkg.priceUsd} USD)
                         </span>

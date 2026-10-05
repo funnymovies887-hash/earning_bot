@@ -3007,7 +3007,7 @@ async function startServer() {
     }
 
     const botUsername = (telegramConfig.botUsername || "CholoIncomeKoriBot").replace("@", "");
-    const miniAppDeepLink = `https://t.me/${botUsername}/app?startapp=video_${vid.id}`;
+    const miniAppDeepLink = `https://t.me/${botUsername}?startapp=video_${vid.id}`;
 
     const caption = `🎥 **${vid.title}** (ফ্রি ডেমো ভিডিও)\n\n${vid.description}\n\n⏱️ ডেমো দৈর্ঘ্য: ${vid.previewDuration} | ফুল ভিডিও: ${vid.fullDuration}\n✨ ${vid.requiredAds}টি স্পন্সর বিজ্ঞাপন দেখলেই সম্পূর্ণ ফুল ভিডিওটি ৯০ মিনিটের জন্য আনলক হবে!\n\n👇 সম্পূর্ণ ভিডিও দেখতে নিচের বাটনে ক্লিক করুন:`;
 
@@ -3194,12 +3194,13 @@ async function startServer() {
     let cleanFullUrl = (fullVideoUrl && fullVideoUrl.trim()) ? fullVideoUrl.trim() : "";
     if (cleanFullUrl) {
       if (cleanFullUrl.startsWith("video_") || cleanFullUrl.startsWith("lock-vid-") || /^\d+$/.test(cleanFullUrl)) {
-        cleanFullUrl = `https://t.me/${botUser}/app?startapp=${cleanFullUrl.startsWith("video_") ? cleanFullUrl : "video_" + cleanFullUrl}`;
-      } else if (cleanFullUrl.includes("t.me/") && !cleanFullUrl.includes("/app")) {
-        cleanFullUrl = cleanFullUrl.replace(/t\.me\/([^\/\?]+)(\?startapp=.*)/, 't.me/$1/app$2');
+        const rawId = cleanFullUrl.startsWith("video_") ? cleanFullUrl.replace("video_", "") : cleanFullUrl;
+        cleanFullUrl = `https://t.me/${botUser}?startapp=video_${rawId}`;
+      } else if (cleanFullUrl.includes("t.me/") && !cleanFullUrl.includes("startapp=")) {
+        cleanFullUrl = `https://t.me/${botUser}?startapp=video_1`;
       }
     }
-    const validFullUrl = cleanFullUrl || `https://t.me/${botUser}/app`;
+    const validFullUrl = cleanFullUrl || `https://t.me/${botUser}?startapp=video_1`;
     const validDemoUrl = (demoUrl && demoUrl.trim()) ? demoUrl.trim() : "https://t.me/demovideos24";
     const validTutUrl = (tutorialUrl && tutorialUrl.trim()) ? tutorialUrl.trim() : "https://t.me/CholoIncomeKori";
 
@@ -3663,6 +3664,9 @@ async function startServer() {
         : ["প্রিমিয়াম ফিচার অন্তর্ভুক্ত"],
       priceBdt: Number(req.body.priceBdt) || 450,
       priceUsd: Number(req.body.priceUsd) || 3.75,
+      originalPriceBdt: req.body.originalPriceBdt ? Number(req.body.originalPriceBdt) : undefined,
+      discountBadge: (req.body.discountBadge || "").trim() || undefined,
+      isSpecialOffer: Boolean(req.body.isSpecialOffer || req.body.discountBadge || (req.body.originalPriceBdt && Number(req.body.originalPriceBdt) > Number(req.body.priceBdt))),
       thumbnail: req.body.thumbnail || "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=500&auto=format&fit=crop&q=60",
       downloadUrl: req.body.downloadUrl || "https://drive.google.com",
       hashtags: hashtags.length > 0 ? hashtags : ['#Software', '#DigitalStore', '#VIP'],

@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" content="#581c87" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Cholo Income Kori</title>
     <meta name="description" content="Cholo Income Kori Telegram Mini App (@CholoIncomeKoriBot) featuring task rewards, video ads, referral bonuses, real-time cloud data sync, multi-currency display, push notifications, and instant payment withdrawals." />
     <meta property="og:title" content="Cholo Income Kori" />
@@ -19,12 +19,19 @@
         background-color: #0f172a !important;
         color: #ffffff;
         min-height: 100%;
+        overscroll-behavior: none !important;
+        overscroll-behavior-y: none !important;
         -webkit-tap-highlight-color: transparent !important;
         -webkit-tap-highlight-color: rgba(0,0,0,0) !important;
       }
       *, *::before, *::after {
         -webkit-tap-highlight-color: transparent !important;
         outline: none !important;
+      }
+      button:focus, button:active, [role="button"]:focus, [role="button"]:active {
+        outline: none !important;
+        box-shadow: none !important;
+        -webkit-tap-highlight-color: transparent !important;
       }
     </style>
     <!-- Pre-init Telegram WebApp version hook: ensures sessionStorage sets version 9.0 BEFORE telegram-web-app.js evaluates closure variables -->
@@ -198,6 +205,16 @@
                 } catch(e) {}
               }
             }
+            // Enable full expansion and disable vertical swipe sheet dismiss for smooth scroll
+            try {
+              tg.ready();
+              tg.expand();
+              if (typeof tg.disableVerticalSwipes === 'function') {
+                tg.disableVerticalSwipes();
+              }
+              if (typeof tg.setHeaderColor === 'function') tg.setHeaderColor('#0f172a');
+              if (typeof tg.setBackgroundColor === 'function') tg.setBackgroundColor('#0f172a');
+            } catch(e) {}
           }
         } catch(err) {
           console.warn('[WebApp] CloudStorage polyfill setup note:', err);
@@ -207,7 +224,7 @@
     <!-- Monetag Telegram Mini App Ads SDK (Zone 11898539) -->
     <script src="//libtl.com/sdk.js" data-zone="11898539" data-sdk="show_11898539" async></script>
   </head>
-  <body class="bg-slate-900 text-white antialiased selection:bg-purple-500 selection:text-white min-h-screen overflow-x-hidden">
+  <body class="bg-slate-900 text-white antialiased selection:bg-purple-500 selection:text-white min-h-screen">
     <div id="root" class="min-h-screen flex flex-col bg-slate-900"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

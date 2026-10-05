@@ -44,7 +44,7 @@ const AdminDashboard = React.lazy(() =>
   }))
 );
 import { OfficialNoticeModal } from './components/OfficialNoticeModal';
-import { INITIAL_USER, INITIAL_VIDEOS, DAILY_REFERRAL_TIERS } from './data';
+import { INITIAL_USER, INITIAL_VIDEOS, DAILY_REFERRAL_TIERS, INITIAL_AD_LOCKED_VIDEOS } from './data';
 import { UserProfile, VideoItem, Language, Currency, ReferralCommissionLog, AdLockedVideo } from './types';
 import { NotificationInboxModal, NotificationItem } from './components/NotificationInboxModal';
 import { Headphones, Bell, X, Check, ArrowRight, Gift, ShieldAlert, Sparkles, CheckCircle2 } from 'lucide-react';
@@ -60,6 +60,9 @@ function getInitialTelegramUser() {
       tg.ready?.();
       tg.expand?.();
       try {
+        if (typeof tg.disableVerticalSwipes === 'function') {
+          tg.disableVerticalSwipes();
+        }
         tg.setHeaderColor?.('#0f172a');
         tg.setBackgroundColor?.('#0f172a');
       } catch {}
@@ -409,6 +412,16 @@ export default function App() {
       const startParam = extractTelegramStartParam();
       if (!startParam) return;
 
+      // 1. Immediately match against INITIAL_AD_LOCKED_VIDEOS for instant modal popup
+      const localMatch = matchAdLockedVideo(INITIAL_AD_LOCKED_VIDEOS, startParam);
+      if (localMatch) {
+        setShowSplash(false);
+        setShowWelcome(false);
+        setActiveAdLockedVideo(localMatch);
+        setActiveTab('home');
+      }
+
+      // 2. Fetch latest server videos to get fresh unlock states
       fetch('/api/ad-videos')
         .then((res) => res.json())
         .then((vids) => {
@@ -658,13 +671,13 @@ export default function App() {
   };
 
   // Splash complete -> open Welcome Modal (mandatory channel verification)
-  const handleSplashComplete = () => {
+  const handleSplashComplete = React.useCallback(() => {
     setShowSplash(false);
     const hasDeepLink = extractTelegramStartParam();
     if (!hasDeepLink) {
       setShowWelcome(true);
     }
-  };
+  }, []);
 
   // Tab change handler - fast responsive tab navigation
   const handleTabChange = (tab: NavTab) => {
