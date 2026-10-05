@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Play, Award, CheckCircle2 } from 'lucide-react';
+import { X, Play, Award, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { VideoItem, UserProfile } from '../types';
 import confetti from 'canvas-confetti';
 
@@ -19,17 +19,19 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   user,
   onRewardClaimed,
 }) => {
-  const [countdown, setCountdown] = React.useState(8);
+  const [countdown, setCountdown] = React.useState(15);
   const [canClaim, setCanClaim] = React.useState(false);
   const [isPlaying, setIsPlaying] = React.useState(true);
   const [isCompleted, setIsCompleted] = React.useState(false);
+  const [showExitWarning, setShowExitWarning] = React.useState(false);
 
   React.useEffect(() => {
     if (isOpen && video) {
-      setCountdown(6);
+      setCountdown(15);
       setCanClaim(false);
       setIsPlaying(true);
       setIsCompleted(false);
+      setShowExitWarning(false);
 
       const interval = setInterval(() => {
         setCountdown((prev) => {
@@ -48,6 +50,14 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
   if (!isOpen || !video) return null;
 
+  const handleAttemptClose = () => {
+    if (countdown > 0 && !isCompleted) {
+      setShowExitWarning(true);
+    } else {
+      onClose();
+    }
+  };
+
   const handleClaim = () => {
     setIsCompleted(true);
     confetti({ particleCount: 70, spread: 60, origin: { y: 0.5 } });
@@ -59,7 +69,12 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) handleAttemptClose();
+        }}
+      >
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -74,8 +89,8 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
               <span className="text-xs font-bold text-slate-300">Sponsored Ad & Video Stream</span>
             </div>
             <button
-              onClick={onClose}
-              className="w-7 h-7 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400"
+              onClick={handleAttemptClose}
+              className="w-7 h-7 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -151,6 +166,36 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
             )}
           </div>
         </motion.div>
+
+        {/* Early Exit Warning Modal */}
+        {showExitWarning && (
+          <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/90">
+            <div className="w-full max-w-xs bg-slate-900 border-2 border-rose-500 rounded-2xl p-4 text-center space-y-3 text-white">
+              <AlertTriangle className="w-10 h-10 text-rose-500 mx-auto animate-bounce" />
+              <h4 className="text-sm font-black text-rose-400">সতর্কবার্তা!</h4>
+              <p className="text-xs text-slate-300">
+                বিজ্ঞাপন এখনো সম্পূর্ণ শেষ হয়নি ({countdown} সেকেন্ড বাকি)! সম্পূর্ণ সময় না দেখলে <b>কোনো রিওয়ার্ড ব্যালেন্সে যোগ হবে না</b>।
+              </p>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => setShowExitWarning(false)}
+                  className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs"
+                >
+                  বিজ্ঞাপন দেখুন
+                </button>
+                <button
+                  onClick={() => {
+                    setShowExitWarning(false);
+                    onClose();
+                  }}
+                  className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-rose-900 text-slate-300 text-xs"
+                >
+                  বের হয়ে যান
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AnimatePresence>
   );

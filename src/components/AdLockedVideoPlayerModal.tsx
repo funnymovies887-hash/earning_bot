@@ -14,6 +14,7 @@ import {
   Zap,
   Eye,
   Loader2,
+  AlertTriangle,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { AdLockedVideo, UserProfile } from '../types';
@@ -46,6 +47,8 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
   // Active watching Monetag ad state
   const [isAdPlaying, setIsAdPlaying] = useState(false);
   const [isAdSubmitting, setIsAdSubmitting] = useState(false);
+  const [adTimerRemaining, setAdTimerRemaining] = useState<number>(0);
+  const [showExitWarning, setShowExitWarning] = useState(false);
 
   // Sending to channel status
   const [isSendingToChannel, setIsSendingToChannel] = useState(false);
@@ -140,51 +143,80 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
     openTelegramLinkSafe(targetUrl);
   };
 
-  // Trigger real Monetag rewarded ad (show_11898539 / show_11898539('pop'))
+  // Attempt to close modal with safety check if ad is currently playing
+  const handleAttemptClose = () => {
+    if (isAdPlaying && adTimerRemaining > 0) {
+      setShowExitWarning(true);
+    } else {
+      onClose();
+    }
+  };
+
+  // Trigger real Monetag rewarded ad (show_11898539 / show_11898539('pop')) with strict full-duration watch enforcement
   const handleWatchMonetagAd = async () => {
     triggerAdsterraPopunder();
     if (isAdPlaying || isAdSubmitting) return;
+
+    const fullDuration = Number(video.adTimerSeconds) || 15;
     setIsAdPlaying(true);
+    setAdTimerRemaining(fullDuration);
     setStatusNotification(null);
+
+    // Guaranteed countdown timer that user must stay through
+    let timerInterval: any = null;
+    const timerPromise = new Promise<void>((resolve) => {
+      let timeLeft = fullDuration;
+      timerInterval = setInterval(() => {
+        timeLeft -= 1;
+        setAdTimerRemaining(timeLeft);
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          resolve();
+        }
+      }, 1000);
+    });
 
     try {
       // 1. Invoke official Monetag Rewarded format
-      const completed = await showMonetagRewardedAd();
+      const adPromise = showMonetagRewardedAd().catch((err) => {
+        console.warn('[Monetag] Ad watch error:', err);
+        return true;
+      });
 
-      if (completed) {
-        setIsAdSubmitting(true);
-        const res = await fetch('/api/ad-videos/progress', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ videoId: video.id, userId: user.id }),
-        });
-        const data = await res.json();
+      // User MUST watch for the full specified time
+      await Promise.all([adPromise, timerPromise]);
 
-        if (data.success) {
-          setAdsWatched(data.adsWatched);
+      setIsAdSubmitting(true);
+      const res = await fetch('/api/ad-videos/progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoId: video.id, userId: user.id }),
+      });
+      const data = await res.json();
 
-          if (data.canSendInbox || data.adsWatched >= requiredAds) {
-            confetti({ particleCount: 90, spread: 80, origin: { y: 0.6 } });
-            setStatusNotification({
-              type: 'success',
-              text: '🎉 বিজ্ঞাপন দেখা সম্পন্ন হয়েছে! এবার নিচের নীল বাটনে ক্লিক করে ইনবক্সে ফুল ভিডিও নিন।',
-            });
-            // Do not fire duplicate unlock notification here; it will fire once when video is sent/unlocked
-          } else {
-            setStatusNotification({
-              type: 'success',
-              text: `একটি বিজ্ঞাপন সম্পন্ন হয়েছে! বাকি আছে ${Math.max(0, requiredAds - data.adsWatched)}টি।`,
-            });
-          }
+      if (data.success) {
+        setAdsWatched(data.adsWatched);
+
+        if (data.canSendInbox || data.adsWatched >= requiredAds) {
+          confetti({ particleCount: 90, spread: 80, origin: { y: 0.6 } });
+          setStatusNotification({
+            type: 'success',
+            text: '🎉 সম্পূর্ণ বিজ্ঞাপন দেখা সফল হয়েছে! এবার নিচের বাটনে ক্লিক করে ইনবক্সে ফুল ভিডিও নিন।',
+          });
+        } else {
+          setStatusNotification({
+            type: 'success',
+            text: `একটি সম্পূর্ণ বিজ্ঞাপন সম্পন্ন হয়েছে! বাকি আছে ${Math.max(0, requiredAds - data.adsWatched)}টি।`,
+          });
         }
       }
     } catch (err: any) {
       console.warn('[Monetag] Ad watch error:', err);
-      // Fallback increment so users are never permanently blocked
-      setAdsWatched((prev) => prev + 1);
     } finally {
+      if (timerInterval) clearInterval(timerInterval);
       setIsAdPlaying(false);
       setIsAdSubmitting(false);
+      setAdTimerRemaining(0);
     }
   };
 
@@ -262,7 +294,7 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
         id="ad-locked-video-modal-backdrop"
         className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto"
         onClick={(e) => {
-          if (e.target === e.currentTarget) onClose();
+          if (e.target === e.currentTarget) handleAttemptClose();
         }}
       >
         {/* Modal Container: Yellow / Gold Telegram Theme as requested by user */}
@@ -283,7 +315,7 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
             </div>
 
             <button
-              onClick={onClose}
+              onClick={handleAttemptClose}
               className="w-7 h-7 rounded-full bg-amber-500 hover:bg-amber-600 active:scale-90 text-slate-900 flex items-center justify-center transition-all cursor-pointer font-bold shadow-xs"
               title="বন্ধ করুন"
             >
@@ -503,7 +535,11 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
                 {isAdPlaying || isAdSubmitting ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                    <span>বিজ্ঞাপন চলছে... (Watching Monetag Ad)</span>
+                    <span>
+                      {adTimerRemaining > 0
+                        ? `⏳ বিজ্ঞাপন চলছে: ${adTimerRemaining}s অপেক্ষা করুন...`
+                        : 'বিজ্ঞাপন সম্পন্ন হচ্ছে...'}
+                    </span>
                   </>
                 ) : (
                   <>
@@ -517,6 +553,39 @@ export const AdLockedVideoPlayerModal: React.FC<AdLockedVideoPlayerModalProps> =
             )}
           </div>
         </motion.div>
+
+        {/* Early Exit Warning Modal */}
+        {showExitWarning && (
+          <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/90">
+            <div className="w-full max-w-xs bg-slate-900 border-2 border-rose-500 rounded-2xl p-4 text-center space-y-3 text-white">
+              <AlertTriangle className="w-10 h-10 text-rose-500 mx-auto animate-bounce" />
+              <h4 className="text-sm font-black text-rose-400">সতর্কবার্তা!</h4>
+              <p className="text-xs text-slate-300">
+                বিজ্ঞাপন এখনো সম্পূর্ণ শেষ হয়নি ({adTimerRemaining} সেকেন্ড বাকি)! সম্পূর্ণ সময় না দেখলে <b>ভিডিও আনলক হবে না</b>।
+              </p>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => setShowExitWarning(false)}
+                  className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs"
+                >
+                  অ্যাড চালিয়ে যান
+                </button>
+                <button
+                  onClick={() => {
+                    setShowExitWarning(false);
+                    setIsAdPlaying(false);
+                    setIsAdSubmitting(false);
+                    setAdTimerRemaining(0);
+                    onClose();
+                  }}
+                  className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-rose-900 text-slate-300 text-xs"
+                >
+                  বের হয়ে যান
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AnimatePresence>
   );

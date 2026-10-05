@@ -27,6 +27,7 @@ import { TRANSLATIONS } from '../i18n';
 import confetti from 'canvas-confetti';
 import { toLocalizedDigits, formatMoney } from '../utils/formatters';
 import { triggerAdsterraPopunder } from '../utils/adsterra';
+import { AdWatchingModal } from './AdWatchingModal';
 
 interface EarnTabProps {
   user: UserProfile;
@@ -55,6 +56,7 @@ export const EarnTab: React.FC<EarnTabProps> = ({
   const [loadingTasks, setLoadingTasks] = React.useState(false);
   const [activeTask, setActiveTask] = React.useState<{ id: string; title: string; reward: number; duration: number; type: string } | null>(null);
   const [taskCountdown, setTaskCountdown] = React.useState(0);
+  const [runningAdModalTask, setRunningAdModalTask] = React.useState<IncomeTask | null>(null);
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [incomeConfig, setIncomeConfig] = React.useState<any>(propIncomeConfig || null);
   const [selectedDetailTask, setSelectedDetailTask] = React.useState<{
@@ -123,28 +125,8 @@ export const EarnTab: React.FC<EarnTabProps> = ({
     // Trigger Adsterra Popunder Ad when user begins task
     triggerAdsterraPopunder();
 
-    const duration = task.timerSeconds || 15;
-    setActiveTask({
-      id: task.id,
-      title: task.title,
-      reward: task.rewardUsd,
-      duration,
-      type: task.category,
-    });
-    setTaskCountdown(duration);
-
-    // Open destination URL (e.g. Adsterra Direct Link or Web Page)
-    if (task.destinationUrl) {
-      try {
-        if ((window as any).Telegram?.WebApp?.openLink) {
-          (window as any).Telegram.WebApp.openLink(task.destinationUrl);
-        } else {
-          window.open(task.destinationUrl, '_blank', 'noopener,noreferrer');
-        }
-      } catch {
-        window.open(task.destinationUrl, '_blank', 'noopener,noreferrer');
-      }
-    }
+    // Secure Full-Time Watching Verification: Open AdWatchingModal with exact duration and mandatory full ad view
+    setRunningAdModalTask(task);
   };
 
   React.useEffect(() => {
@@ -1081,6 +1063,23 @@ export const EarnTab: React.FC<EarnTabProps> = ({
             })()}
           </div>
         </div>
+      )}
+
+      {/* Full-Time Enforced Ad Watching Modal for Tasks */}
+      {runningAdModalTask && (
+        <AdWatchingModal
+          isOpen={Boolean(runningAdModalTask)}
+          onClose={() => setRunningAdModalTask(null)}
+          title={runningAdModalTask.title || '🎬 স্পন্সরড বিজ্ঞাপন ভেরিফিকেশন'}
+          duration={runningAdModalTask.timerSeconds || 15}
+          rewardBdt={runningAdModalTask.rewardBdt || +(runningAdModalTask.rewardUsd * 120).toFixed(2)}
+          rewardUsd={runningAdModalTask.rewardUsd}
+          directAdUrl={runningAdModalTask.destinationUrl || 'https://omg10.com/4/11869572'}
+          onClaimReward={() => {
+            onCompleteTask(runningAdModalTask.id, runningAdModalTask.rewardUsd, runningAdModalTask.category);
+            setRunningAdModalTask(null);
+          }}
+        />
       )}
 
     </div>

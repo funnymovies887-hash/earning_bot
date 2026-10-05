@@ -104,7 +104,12 @@ export const AdWatchingModal: React.FC<AdWatchingModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md select-none overflow-y-auto">
+    <div
+      className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md select-none overflow-y-auto"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) handleAttemptClose();
+      }}
+    >
       <div className="relative w-full max-w-sm bg-gradient-to-b from-slate-900 via-indigo-950/90 to-slate-900 border-2 border-amber-400/80 rounded-3xl p-5 text-white shadow-2xl space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
