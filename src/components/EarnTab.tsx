@@ -491,9 +491,9 @@ export const EarnTab: React.FC<EarnTabProps> = ({
                   timerSeconds: duration,
                   thumbnailUrl: jobThumb,
                   mediaUrl: jobThumb,
-                  instructions: job.instructions || 'ওয়েবসাইটটিতে প্রবেশ করুন এবং ১৫-৩০ সেকেন্ড স্ক্রোল করে পেজের বিষয়বস্তু দেখুন। কাউন্টডাউন শেষ হলে ব্যালেন্সে টাকা জমা হবে।',
+                  instructions: job.instructions || 'ওয়েবসাইটটিতে প্রবেশ করুন এবং ৩০-৬০ সেকেন্ড স্ক্রোল করে পেজের বিষয়বস্তু দেখুন। কাউন্টডাউন শেষ হলে ব্যালেন্সে টাকা জমা হবে।',
                   description: 'হাই-সিপিএম স্পনসরড ওয়েব ভিজিট টাস্ক। নির্ধারিত সময় পেজে অবস্থান করলে বিজ্ঞাপনদাতাদের মাধ্যমে ভেরিফিকেশন সম্পন্ন হবে এবং আপনার ওয়ালেটে সরাসরি টাকা জমা হবে।',
-                  destinationUrl: job.destinationUrl || 'https://www.profitablecpmrate.com/direct-link-visit',
+                  destinationUrl: job.destinationUrl || 'https://researchingsweatexit.com/fx4s1179?key=795515765851a303657a3188bb3b9a45',
                   rawItem: job,
                 })}
                 className="p-3.5 bg-slate-900 border border-purple-500/20 rounded-2xl shadow-sm flex items-center justify-between hover:border-purple-400/50 hover:bg-slate-800/80 transition-all text-white cursor-pointer group"
@@ -1021,11 +1021,11 @@ export const EarnTab: React.FC<EarnTabProps> = ({
                           title: taskToRun.title,
                           category: taskToRun.category,
                           subCategory: taskToRun.subCategory,
-                          destinationUrl: taskToRun.destinationUrl || 'https://www.profitablecpmrate.com/direct-link-visit',
+                          destinationUrl: taskToRun.destinationUrl || 'https://researchingsweatexit.com/fx4s1179?key=795515765851a303657a3188bb3b9a45',
                           mediaType: 'video',
                           rewardUsd: taskToRun.rewardUsd,
                           rewardBdt: taskToRun.rewardBdt || +(taskToRun.rewardUsd * 120).toFixed(2),
-                          timerSeconds: taskToRun.timerSeconds || 15,
+                          timerSeconds: taskToRun.timerSeconds || 30,
                           instructions: taskToRun.instructions || '',
                           isHot: false,
                           isActive: true,
@@ -1071,10 +1071,11 @@ export const EarnTab: React.FC<EarnTabProps> = ({
           isOpen={Boolean(runningAdModalTask)}
           onClose={() => setRunningAdModalTask(null)}
           title={runningAdModalTask.title || '🎬 স্পন্সরড বিজ্ঞাপন ভেরিফিকেশন'}
-          duration={runningAdModalTask.timerSeconds || 15}
+          duration={runningAdModalTask.timerSeconds || 30}
           rewardBdt={runningAdModalTask.rewardBdt || +(runningAdModalTask.rewardUsd * 120).toFixed(2)}
           rewardUsd={runningAdModalTask.rewardUsd}
-          directAdUrl={runningAdModalTask.destinationUrl || 'https://omg10.com/4/11869572'}
+          taskId={runningAdModalTask.id}
+          directAdUrl={runningAdModalTask.destinationUrl || 'https://researchingsweatexit.com/fx4s1179?key=795515765851a303657a3188bb3b9a45'}
           onClaimReward={() => {
             onCompleteTask(runningAdModalTask.id, runningAdModalTask.rewardUsd, runningAdModalTask.category);
             setRunningAdModalTask(null);

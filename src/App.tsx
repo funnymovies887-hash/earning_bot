@@ -374,7 +374,7 @@ export default function App() {
       rewardBdt: 1.5,
       rewardUsd: 0.0125,
       dailyLimit: 40,
-      directAdUrl: 'https://omg10.com/4/11869572',
+      directAdUrl: 'https://researchingsweatexit.com/fx4s1179?key=795515765851a303657a3188bb3b9a45',
     },
   });
 
@@ -1021,15 +1021,15 @@ export default function App() {
                   });
                   return;
                 }
-                const directAdLink = incomeConfig?.ads?.directAdUrl || 'https://omg10.com/4/11869572';
+                const directAdLink = incomeConfig?.ads?.directAdUrl || 'https://researchingsweatexit.com/fx4s1179?key=795515765851a303657a3188bb3b9a45';
                 const adRewardUsd = Number(incomeConfig?.ads?.rewardUsd) || 0.0125;
                 const bdtVal = Number(incomeConfig?.ads?.rewardBdt) || +(adRewardUsd * 120).toFixed(2);
 
-                // Open active security ad watcher modal enforcing 15s timer & mandatory click
+                // Open active security ad watcher modal enforcing 30s/60s timer & active focus verification
                 setAdWatchingSession({
                   isOpen: true,
                   title: '🎬 স্পন্সরড বিজ্ঞাপন ভেরিফিকেশন',
-                  duration: 15,
+                  duration: 30,
                   rewardBdt: bdtVal,
                   rewardUsd: adRewardUsd,
                   directAdUrl: directAdLink,
@@ -1239,7 +1239,7 @@ export default function App() {
             rewardBdt={adWatchingSession.rewardBdt}
             rewardUsd={adWatchingSession.rewardUsd}
             directAdUrl={adWatchingSession.directAdUrl}
-            onClaimReward={() => {
+            onClaimReward={(sessId) => {
               const maxDailyLimit = incomeConfig?.ads?.dailyLimit || user.dailyAdLimit || 40;
               const nextCount = (user.adsWatchedToday || 0) + 1;
               syncUser({
@@ -1253,6 +1253,7 @@ export default function App() {
                   taskId: 'ad-watch-' + Date.now(),
                   rewardUsd: adWatchingSession.rewardUsd,
                   type: 'ad',
+                  sessionId: sessId,
                 }),
               }).catch(() => {});
               addInboxNotification({

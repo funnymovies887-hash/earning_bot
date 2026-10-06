@@ -1155,7 +1155,7 @@ export const AdminIncomeMethodsManager: React.FC<AdminIncomeMethodsManagerProps>
                 </label>
                 <input
                   type="url"
-                  placeholder="https://omg10.com/4/11869572"
+                  placeholder="https://researchingsweatexit.com/fx4s1179?key=795515765851a303657a3188bb3b9a45"
                   value={incomeMethods.ads.directAdUrl || ''}
                   onChange={(e) => {
                     setIsSettingsDirty(true);

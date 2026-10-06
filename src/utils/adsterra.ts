@@ -6,6 +6,8 @@
 
 import { isAdSuppressed } from './monetag';
 
+export const ADSTERRA_DIRECT_LINK = 'https://researchingsweatexit.com/fx4s1179?key=795515765851a303657a3188bb3b9a45';
+
 /**
  * Safe initializer: Does NOT inject full-page click-trap overlays into DOM.
  */
