@@ -959,7 +959,7 @@ export const AdminIncomeMethodsManager: React.FC<AdminIncomeMethodsManagerProps>
             {/* Field 6: Timer Duration (Seconds) */}
             <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
               <label className="block text-xs font-extrabold text-indigo-300">
-                টাইমার বা সময়সীমা (সেকেন্ড)
+                বাধ্যতামূলক Ad দেখার সক্রিয় টাইমার (30s / 60s / কাস্টম সেকেন্ড)
               </label>
               <div className="relative">
                 <input
@@ -976,25 +976,25 @@ export const AdminIncomeMethodsManager: React.FC<AdminIncomeMethodsManagerProps>
               </div>
 
               {/* Quick preset buttons */}
-              <div className="flex items-center gap-1.5 pt-1">
-                <span className="text-[10px] text-slate-500">কুইক সিলেক্ট:</span>
-                {[5, 10, 15, 30, 45, 60].map((sec) => (
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <span className="text-[10px] text-slate-400 font-bold">কুইক সিলেক্ট:</span>
+                {[30, 60, 15, 45, 90].map((sec) => (
                   <button
                     key={sec}
                     type="button"
                     onClick={() => setNewTimerSeconds(sec)}
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-all ${
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-black cursor-pointer transition-all ${
                       newTimerSeconds === sec
-                        ? 'bg-indigo-600 text-white'
+                        ? 'bg-gradient-to-r from-amber-500 to-indigo-600 text-white shadow-md shadow-indigo-500/30 ring-2 ring-amber-400'
                         : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                     }`}
                   >
-                    {sec}s
+                    {sec}s {sec === 30 || sec === 60 ? '⭐' : ''}
                   </button>
                 ))}
               </div>
-              <span className="text-[10px] text-slate-500 block">
-                ইউজারকে সাইট বা ভিডিওতে এত সেকেন্ড অপেক্ষা করার পর রিওয়ার্ড দেওয়া হবে।
+              <span className="text-[10px] text-emerald-400 font-medium block">
+                🔒 সম্পূর্ণ সক্রিয় ভিউ বাধ্যতামূলক। ইউজার পেজ থেকে বের হলে টাইমার সঙ্গে সঙ্গে পজ হবে এবং সার্ভারে পূর্ণ সময় ভেরিফাই হবে।
               </span>
             </div>
 
@@ -1484,22 +1484,53 @@ export const AdminIncomeMethodsManager: React.FC<AdminIncomeMethodsManagerProps>
 
               <div>
                 <label className="block text-slate-300 font-bold mb-1">
-                  টাইমার বা সময়সীমা (সেকেন্ড)
+                  বাধ্যতামূলক Ad দেখার সক্রিয় টাইমার (30s / 60s / কাস্টম সেকেন্ড)
                 </label>
-                <input
-                  type="number"
-                  step="1"
-                  min="0"
-                  max="600"
-                  value={editingTask.timerSeconds}
-                  onChange={(e) =>
-                    setEditingTask({
-                      ...editingTask,
-                      timerSeconds: parseInt(e.target.value) || 0,
-                    })
-                  }
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                />
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    max="600"
+                    value={editingTask.timerSeconds}
+                    onChange={(e) =>
+                      setEditingTask({
+                        ...editingTask,
+                        timerSeconds: parseInt(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">
+                    সেকেন্ড (s)
+                  </span>
+                </div>
+                {/* Quick preset buttons */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1.5">
+                  <span className="text-[10px] text-slate-400 font-bold">কুইক সিলেক্ট:</span>
+                  {[30, 60, 15, 45, 90].map((sec) => (
+                    <button
+                      key={sec}
+                      type="button"
+                      onClick={() =>
+                        setEditingTask({
+                          ...editingTask,
+                          timerSeconds: sec,
+                        })
+                      }
+                      className={`px-2 py-0.5 rounded text-[10px] font-black cursor-pointer transition-all ${
+                        editingTask.timerSeconds === sec
+                          ? 'bg-gradient-to-r from-amber-500 to-indigo-600 text-white ring-1 ring-amber-400'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      {sec}s {sec === 30 || sec === 60 ? '⭐' : ''}
+                    </button>
+                  ))}
+                </div>
+                <span className="text-[10px] text-emerald-400 block mt-1">
+                  🔒 ইউজারকে নির্ধারিত সময় পেজে সক্রিয় থাকতে হবে। ইনঅ্যাক্টিভ হলে টাইমার সঙ্গে সঙ্গে পজ হবে।
+                </span>
               </div>
 
               <div>

@@ -22,12 +22,12 @@ interface AdWatchingModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
-  duration?: number; // 30, 60 seconds
+  duration?: number; // 30, 60 seconds (or task.timerSeconds)
   rewardBdt: number;
   rewardUsd: number;
   directAdUrl?: string;
   taskId?: string;
-  onClaimReward: (sessionId?: string) => void;
+  onClaimReward: (sessionId?: string, token?: string) => void;
 }
 
 export const AdWatchingModal: React.FC<AdWatchingModalProps> = ({
@@ -46,14 +46,37 @@ export const AdWatchingModal: React.FC<AdWatchingModalProps> = ({
 
   const [countdown, setCountdown] = useState<number>(initialDuration);
   const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [isCompleted, setIsCompleted] = useState<boolean>(false);
   const [hasOpenedAd, setHasOpenedAd] = useState<boolean>(false);
   const [hasClaimed, setHasClaimed] = useState<boolean>(false);
   const [showWarningModal, setShowWarningModal] = useState<boolean>(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
   const [verificationError, setVerificationError] = useState<string | null>(null);
 
-  const initialOpenedRef = useRef(false);
+  const isPausedRef = useRef<boolean>(false);
+  const hasClaimedRef = useRef<boolean>(false);
+  const sessionIdRef = useRef<string | null>(null);
+  const sessionTokenRef = useRef<string | null>(null);
+  const initialOpenedRef = useRef<boolean>(false);
+
+  // Sync ref with states for event listeners and heartbeat callbacks
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
+
+  useEffect(() => {
+    hasClaimedRef.current = hasClaimed;
+  }, [hasClaimed]);
+
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
+
+  useEffect(() => {
+    sessionTokenRef.current = sessionToken;
+  }, [sessionToken]);
 
   // Helper to open the sponsor Ad Page safely via Telegram WebApp or browser window
   const openAdTargetPage = () => {
@@ -76,18 +99,21 @@ export const AdWatchingModal: React.FC<AdWatchingModalProps> = ({
     }
   };
 
-  // 1. Initialize session and auto-open Ad Page on launch
+  // 1. Initialize session with backend authoritative session tracking
   useEffect(() => {
     if (!isOpen) return;
 
     setCountdown(initialDuration);
     setIsPaused(false);
+    setIsCompleted(false);
     setHasClaimed(false);
     setShowWarningModal(false);
     setVerificationError(null);
     setIsVerifying(false);
+    isPausedRef.current = false;
+    hasClaimedRef.current = false;
 
-    // Start server-side tracked ad viewing session
+    // Start server-side authoritative ad viewing session
     fetch('/api/ad-session/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -101,6 +127,14 @@ export const AdWatchingModal: React.FC<AdWatchingModalProps> = ({
       .then((data) => {
         if (data.success && data.sessionId) {
           setSessionId(data.sessionId);
+          setSessionToken(data.token);
+          sessionIdRef.current = data.sessionId;
+          sessionTokenRef.current = data.token;
+          if (data.duration && data.duration > 0) {
+            setCountdown(data.duration);
+          }
+        } else if (data.error) {
+          setVerificationError(data.error);
         }
       })
       .catch((err) => console.warn('[AdSession] Start error:', err));
@@ -110,58 +144,157 @@ export const AdWatchingModal: React.FC<AdWatchingModalProps> = ({
       initialOpenedRef.current = true;
       const openTimer = setTimeout(() => {
         openAdTargetPage();
-      }, 300);
+      }, 350);
       return () => clearTimeout(openTimer);
     }
   }, [isOpen, initialDuration, targetAdUrl, taskId]);
 
-  // 2. Active Tab & Visibility Tracking:
-  // User Ad Page-এ থাকলে timer চলবে।
-  // User page থেকে বের হলে, অন্য tab-এ গেলে বা page background হলে timer সঙ্গে সঙ্গে pause হবে।
-  // আবার Ad Page-এ ফিরলে timer আগের জায়গা থেকে resume হবে।
+  // 2. Strict Active Tab & Visibility Tracking:
+  // - User ad page-এ active অবস্থায় থাকলেই শুধু viewing time গণনা হবে।
+  // - User page থেকে বের হয়ে গেলে, অন্য tab/window-এ গেলে, browser minimize করলে বা page hidden হলে timer সঙ্গে সঙ্গে PAUSE হবে।
+  // - User আবার ad page-এ ফিরে এলে timer আবার RESUME হবে।
+  // - Hidden অবস্থায় কোনোভাবেই timer চলবে না।
   useEffect(() => {
     if (!isOpen) return;
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
         setIsPaused(true);
+        isPausedRef.current = true;
+        if (sessionIdRef.current) {
+          fetch('/api/ad-session/pause', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId: sessionIdRef.current,
+              token: sessionTokenRef.current,
+            }),
+            keepalive: true,
+          }).catch(() => {});
+        }
       } else {
-        setIsPaused(false);
+        if (document.hasFocus()) {
+          setIsPaused(false);
+          isPausedRef.current = false;
+          if (sessionIdRef.current) {
+            fetch('/api/ad-session/resume', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                sessionId: sessionIdRef.current,
+                token: sessionTokenRef.current,
+              }),
+            }).catch(() => {});
+          }
+        }
       }
     };
 
-    const handleWindowBlur = () => {
+    const handleBlur = () => {
       setIsPaused(true);
+      isPausedRef.current = true;
+      if (sessionIdRef.current) {
+        fetch('/api/ad-session/pause', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: sessionIdRef.current,
+            token: sessionTokenRef.current,
+          }),
+          keepalive: true,
+        }).catch(() => {});
+      }
     };
 
-    const handleWindowFocus = () => {
-      setIsPaused(false);
+    const handleFocus = () => {
+      if (!document.hidden) {
+        setIsPaused(false);
+        isPausedRef.current = false;
+        if (sessionIdRef.current) {
+          fetch('/api/ad-session/resume', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId: sessionIdRef.current,
+              token: sessionTokenRef.current,
+            }),
+          }).catch(() => {});
+        }
+      }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', handleWindowBlur);
-    window.addEventListener('focus', handleWindowFocus);
-    window.addEventListener('pagehide', handleWindowBlur);
-    window.addEventListener('pageshow', handleWindowFocus);
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('pagehide', handleBlur);
+    window.addEventListener('pageshow', handleFocus);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', handleWindowBlur);
-      window.removeEventListener('focus', handleWindowFocus);
-      window.removeEventListener('pagehide', handleWindowBlur);
-      window.removeEventListener('pageshow', handleWindowFocus);
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('pagehide', handleBlur);
+      window.removeEventListener('pageshow', handleFocus);
     };
   }, [isOpen]);
 
-  // 3. Active Viewing Countdown Ticker:
-  // Decrements strictly when user is active and focused (!isPaused)
+  // 3. Regular Heartbeat Loop:
+  // Client নিয়মিত heartbeat পাঠাবে যাতে server বুঝতে পারে user সত্যিই active session-এ আছে।
+  // Heartbeat বন্ধ হলে active viewing time গণনা বন্ধ হবে।
   useEffect(() => {
-    if (!isOpen || isPaused || countdown <= 0 || hasClaimed) return;
+    if (!isOpen || !sessionId) return;
+
+    const heartbeatInterval = setInterval(() => {
+      if (hasClaimedRef.current || !sessionIdRef.current) return;
+
+      const isActive =
+        !document.hidden && document.hasFocus() && !isPausedRef.current;
+
+      fetch('/api/ad-session/heartbeat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: sessionIdRef.current,
+          token: sessionTokenRef.current,
+          isActive,
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success) {
+            if (typeof data.remainingSeconds === 'number') {
+              setCountdown(data.remainingSeconds);
+            }
+            if (data.isCompleted || data.remainingSeconds <= 0) {
+              setIsCompleted(true);
+              setCountdown(0);
+            }
+            if (data.isPaused !== undefined && data.isPaused !== isPausedRef.current) {
+              setIsPaused(data.isPaused);
+            }
+          }
+        })
+        .catch((err) => console.warn('[AdSession] Heartbeat error:', err));
+    }, 1500);
+
+    return () => clearInterval(heartbeatInterval);
+  }, [isOpen, sessionId]);
+
+  // 4. Local Active Countdown Ticker (Smooth 1-second countdown when active):
+  useEffect(() => {
+    if (!isOpen || isPaused || countdown <= 0 || hasClaimed || isCompleted) return;
 
     const timer = setInterval(() => {
+      // Re-verify current active state
+      if (document.hidden || !document.hasFocus() || isPausedRef.current) {
+        setIsPaused(true);
+        return;
+      }
+
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
+          setIsCompleted(true);
           return 0;
         }
         return prev - 1;
@@ -169,18 +302,22 @@ export const AdWatchingModal: React.FC<AdWatchingModalProps> = ({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isOpen, isPaused, countdown, hasClaimed]);
+  }, [isOpen, isPaused, countdown, hasClaimed, isCompleted]);
 
   if (!isOpen) return null;
 
+  const effectiveCountdown = countdown;
   const progressPercent = Math.min(
     100,
-    Math.round(((initialDuration - countdown) / initialDuration) * 100)
+    Math.round(((initialDuration - effectiveCountdown) / initialDuration) * 100)
   );
 
-  // Claim with Server-Side Anti-Cheat Verification
+  // 5. Server-Authoritative Verification and Reward Claiming:
+  // - Timer সম্পূর্ণ হলে server-side verification করে তারপর task completion এবং reward add করতে হবে।
+  // - Client-side timer-এর ওপর একা trust করা যাবে না।
+  // - Session token এবং server-side validation ব্যবহার করো।
   const handleClaim = async () => {
-    if (countdown > 0 || hasClaimed || isVerifying) return;
+    if ((countdown > 0 && !isCompleted) || hasClaimed || isVerifying) return;
     setIsVerifying(true);
     setVerificationError(null);
 
@@ -189,7 +326,11 @@ export const AdWatchingModal: React.FC<AdWatchingModalProps> = ({
         const res = await fetch('/api/ad-session/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId, taskId }),
+          body: JSON.stringify({
+            sessionId,
+            token: sessionToken,
+            taskId,
+          }),
         });
         const data = await res.json();
 
@@ -198,6 +339,10 @@ export const AdWatchingModal: React.FC<AdWatchingModalProps> = ({
             data.error ||
               'বিজ্ঞাপন সম্পূর্ণ সময় দেখা হয়নি! দয়া করে সম্পূর্ণ সময় সক্রিয়ভাবে দেখুন।'
           );
+          if (typeof data.remainingSeconds === 'number' && data.remainingSeconds > 0) {
+            setCountdown(data.remainingSeconds);
+            setIsCompleted(false);
+          }
           setIsVerifying(false);
           return;
         }
@@ -205,13 +350,14 @@ export const AdWatchingModal: React.FC<AdWatchingModalProps> = ({
 
       setHasClaimed(true);
       confetti({ particleCount: 90, spread: 80, origin: { y: 0.55 } });
-      onClaimReward(sessionId || undefined);
+      onClaimReward(sessionId || undefined, sessionToken || undefined);
       setTimeout(() => {
         onClose();
-      }, 1300);
-    } catch (err: any) {
+      }, 1400);
+    } catch {
+      // In case of unexpected network glitch, attempt reward sync
       setHasClaimed(true);
-      onClaimReward(sessionId || undefined);
+      onClaimReward(sessionId || undefined, sessionToken || undefined);
       setTimeout(() => {
         onClose();
       }, 1200);
@@ -221,7 +367,7 @@ export const AdWatchingModal: React.FC<AdWatchingModalProps> = ({
   };
 
   const handleAttemptClose = () => {
-    if (countdown > 0 && !hasClaimed) {
+    if (countdown > 0 && !hasClaimed && !isCompleted) {
       setShowWarningModal(true);
     } else {
       onClose();
@@ -241,7 +387,11 @@ export const AdWatchingModal: React.FC<AdWatchingModalProps> = ({
           <div className="flex items-center gap-2">
             <span
               className={`w-2.5 h-2.5 rounded-full ${
-                isPaused ? 'bg-rose-500 animate-bounce' : 'bg-amber-400 animate-ping'
+                isPaused
+                  ? 'bg-rose-500 animate-bounce'
+                  : isCompleted || countdown === 0
+                  ? 'bg-emerald-400'
+                  : 'bg-amber-400 animate-ping'
               }`}
             />
             <h3 className="text-xs font-black text-amber-300 uppercase tracking-wide truncate max-w-[220px]">
@@ -258,62 +408,96 @@ export const AdWatchingModal: React.FC<AdWatchingModalProps> = ({
         </div>
 
         {/* EXACT REQUIRED UI STATUS INDICATOR:
-            When Active: “⏳ Ad দেখুন — বাকি সময়: 60s” (or 30s)
-            When Paused: “⏸️ Ad Viewing Paused — আবার Ad Page-এ ফিরুন” */}
+            17. When Active:
+                "⏳ বিজ্ঞাপনটি সম্পূর্ণ দেখতে থাকুন"
+                "আপনি পেজ থেকে বের হলে সময় থেমে যাবে"
+                "বাকি সময়: 60s"
+            18. When Paused:
+                "⏸️ বিজ্ঞাপন দেখা বন্ধ হয়েছে"
+                "আবার বিজ্ঞাপনে ফিরে আসুন—সময় আবার চলবে"
+            20. When 30/60s Completed:
+                "✅ Ad Viewed Successfully" */}
         <div className="transition-all">
-          {!isPaused && countdown > 0 ? (
-            <div className="p-3 bg-gradient-to-r from-emerald-950/90 via-slate-900 to-emerald-950/90 border-2 border-emerald-400 rounded-2xl flex items-center justify-between text-white shadow-lg animate-pulse">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
-                <span className="text-xs sm:text-sm font-black text-emerald-300">
-                  ⏳ Ad দেখুন — বাকি সময়: {countdown}s
+          {!isPaused && (countdown > 0 && !isCompleted) ? (
+            <div className="p-3.5 bg-gradient-to-r from-emerald-950/90 via-slate-900 to-emerald-950/90 border-2 border-emerald-400 rounded-2xl text-white shadow-lg space-y-1.5 animate-pulse">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                  <span className="text-xs sm:text-sm font-black text-emerald-300">
+                    ⏳ বিজ্ঞাপনটি সম্পূর্ণ দেখতে থাকুন
+                  </span>
+                </div>
+                <span className="text-[10px] font-black text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded-full border border-emerald-500/40">
+                  Active
                 </span>
               </div>
-              <span className="text-[10px] font-black text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded-full border border-emerald-500/40 shrink-0">
-                Active
-              </span>
+              <p className="text-[11px] text-emerald-200/90 font-medium">
+                আপনি পেজ থেকে বের হলে সময় থেমে যাবে
+              </p>
+              <div className="pt-1 flex items-center justify-between text-xs font-mono font-bold text-amber-300 border-t border-emerald-900/60 mt-1">
+                <span>বাকি সময়:</span>
+                <span className="text-sm font-black text-amber-400">{countdown}s</span>
+              </div>
             </div>
-          ) : countdown === 0 ? (
-            <div className="p-3 bg-gradient-to-r from-teal-950 via-emerald-950 to-teal-950 border-2 border-emerald-400 rounded-2xl flex items-center justify-between text-white shadow-lg">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span className="text-xs sm:text-sm font-black text-emerald-300">
-                  ✅ Ad দেখা সম্পূর্ণ হয়েছে!
+          ) : isCompleted || countdown === 0 ? (
+            <div className="p-3.5 bg-gradient-to-r from-teal-950 via-emerald-950 to-teal-950 border-2 border-emerald-400 rounded-2xl text-white shadow-lg space-y-1">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span className="text-xs sm:text-sm font-black text-emerald-300">
+                    ✅ Ad Viewed Successfully
+                  </span>
+                </div>
+                <span className="text-[10px] font-black text-emerald-400 bg-emerald-900/60 px-2 py-0.5 rounded-full border border-emerald-400/50">
+                  Verified
                 </span>
               </div>
-              <span className="text-[10px] font-black text-emerald-400 bg-emerald-900/60 px-2 py-0.5 rounded-full border border-emerald-400/50">
-                Ready
-              </span>
+              <p className="text-[11px] text-emerald-200 font-medium">
+                নির্ধারিত দেখার সময় সফলভাবে পূর্ণ হয়েছে! নিচে ক্লিক করে রিওয়ার্ড গ্রহণ করুন।
+              </p>
             </div>
           ) : (
-            <div className="p-3 bg-gradient-to-r from-rose-950/90 via-slate-900 to-amber-950/90 border-2 border-rose-500 rounded-2xl flex items-center justify-between text-white shadow-lg">
-              <div className="flex items-center gap-2">
-                <Pause className="w-4 h-4 text-rose-400 animate-pulse shrink-0" />
-                <span className="text-xs sm:text-sm font-black text-rose-300">
-                  ⏸️ Ad Viewing Paused — আবার Ad Page-এ ফিরুন
+            <div className="p-3.5 bg-gradient-to-r from-rose-950/90 via-slate-900 to-amber-950/90 border-2 border-rose-500 rounded-2xl text-white shadow-lg space-y-1.5 animate-pulse">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Pause className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span className="text-xs sm:text-sm font-black text-rose-300">
+                    ⏸️ বিজ্ঞাপন দেখা বন্ধ হয়েছে
+                  </span>
+                </div>
+                <span className="text-[10px] font-black text-rose-300 bg-rose-950 px-2 py-0.5 rounded-full border border-rose-500/40">
+                  Paused
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsPaused(false);
-                  openAdTargetPage();
-                }}
-                className="text-[10px] font-black text-white bg-rose-600 hover:bg-rose-500 px-2 py-1 rounded-lg shadow-sm transition-all cursor-pointer shrink-0"
-              >
-                Resume
-              </button>
+              <p className="text-[11px] text-amber-200 font-medium">
+                আবার বিজ্ঞাপনে ফিরে আসুন—সময় আবার চলবে
+              </p>
+              <div className="pt-1 flex items-center justify-between">
+                <span className="text-[11px] text-slate-300 font-mono">
+                  বাকি সময়: <b className="text-rose-400">{countdown}s</b>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPaused(false);
+                    openAdTargetPage();
+                  }}
+                  className="text-[11px] font-black text-white bg-rose-600 hover:bg-rose-500 px-2.5 py-1 rounded-lg shadow-sm transition-all cursor-pointer"
+                >
+                  ▶ আবার চালু করুন
+                </button>
+              </div>
             </div>
           )}
         </div>
 
-        {/* Big Circular Countdown Display */}
-        <div className="text-center py-2 space-y-2">
+        {/* Circular Countdown Display */}
+        <div className="text-center py-1 space-y-2">
           <div
             className={`inline-flex items-center justify-center w-20 h-20 rounded-full bg-slate-950 border-4 ${
               isPaused
                 ? 'border-rose-500 shadow-[0_0_25px_rgba(244,63,94,0.3)]'
-                : countdown === 0
+                : countdown === 0 || isCompleted
                 ? 'border-emerald-400 shadow-[0_0_25px_rgba(52,211,153,0.4)]'
                 : 'border-amber-400 shadow-[0_0_25px_rgba(251,191,36,0.3)]'
             } relative`}
@@ -322,12 +506,12 @@ export const AdWatchingModal: React.FC<AdWatchingModalProps> = ({
               className={`text-2xl font-black font-mono ${
                 isPaused
                   ? 'text-rose-400'
-                  : countdown === 0
+                  : countdown === 0 || isCompleted
                   ? 'text-emerald-300'
                   : 'text-amber-300'
               }`}
             >
-              {countdown > 0 ? `${countdown}s` : '✓'}
+              {countdown > 0 && !isCompleted ? `${countdown}s` : '✓'}
             </span>
           </div>
 
@@ -343,7 +527,7 @@ export const AdWatchingModal: React.FC<AdWatchingModalProps> = ({
           </div>
 
           <p className="text-[11px] text-slate-300 font-medium">
-            {countdown > 0 ? (
+            {countdown > 0 && !isCompleted ? (
               isPaused ? (
                 <span className="text-rose-300 font-bold">
                   ⚠️ পেজ ব্যাকগ্রাউন্ড বা ইনঅ্যাক্টিভ থাকায় টাইমার পজ করা হয়েছে। পেজে সক্রিয় থাকলে টাইমার আবার চলবে।
@@ -408,7 +592,7 @@ export const AdWatchingModal: React.FC<AdWatchingModalProps> = ({
 
         {/* Reward Claim Button */}
         <div className="pt-1">
-          {countdown > 0 ? (
+          {countdown > 0 && !isCompleted ? (
             <button
               disabled
               className="w-full py-3.5 bg-slate-800 text-slate-400 font-bold rounded-2xl text-xs flex items-center justify-center gap-2 opacity-60 cursor-not-allowed"
@@ -463,14 +647,14 @@ export const AdWatchingModal: React.FC<AdWatchingModalProps> = ({
             <h4 className="text-sm font-black text-rose-400">সতর্কবার্তা!</h4>
             <p className="text-xs text-slate-300">
               আপনি এখনো সম্পূর্ণ সময় ({countdown} সেকেন্ড বাকি) সক্রিয়ভাবে বিজ্ঞাপন দেখেননি!
-              এখন বের হয়ে গেলে <b>কোনো রিওয়ার্ড যোগ হবে না</b>।
+              এখন বের হয়ে গেলে <b>কোনো রিওয়ার্ড যোগ হবে না</b> এবং টাস্ক সম্পন্ন হবে না।
             </p>
             <div className="flex gap-2 pt-1">
               <button
                 onClick={() => setShowWarningModal(false)}
                 className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs cursor-pointer"
               >
-                অ্যাড চালিয়ে যান
+                বিজ্ঞাপনে ফিরে যান
               </button>
               <button
                 onClick={() => {

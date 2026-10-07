@@ -1602,42 +1602,104 @@ async function startServer() {
   });
 
   // Active Ad Viewing Sessions with Anti-Cheat Server Validation
-  const activeAdSessions: Record<string, {
+  interface AdViewingSession {
+    sessionId: string;
+    token: string;
     userId: string;
     taskId: string;
-    duration: number;
+    requiredDuration: number;
     startedAt: number;
+    lastHeartbeatAt: number;
+    activeViewingSeconds: number;
+    isPaused: boolean;
     completed: boolean;
-  }> = {};
+    claimed: boolean;
+    expiresAt: number;
+  }
+
+  const activeAdSessions: Record<string, AdViewingSession> = {};
+
+  // Clean up expired sessions periodically (every 5 minutes)
+  setInterval(() => {
+    const now = Date.now();
+    for (const [id, s] of Object.entries(activeAdSessions)) {
+      if (now > s.expiresAt || (s.claimed && now - s.startedAt > 30 * 60 * 1000)) {
+        delete activeAdSessions[id];
+      }
+    }
+  }, 5 * 60 * 1000);
 
   // Start Ad Viewing Session
   app.post("/api/ad-session/start", (req, res) => {
     const user = getRequestUser(req);
     const { taskId, duration, directAdUrl } = req.body || {};
-    const durationNum = Math.max(5, Number(duration) || 30);
 
-    const sessionId = `adsess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const todayDateStr = new Date(Date.now() + 6 * 3600 * 1000).toISOString().slice(0, 10);
+    if (user.lastActiveDate && user.lastActiveDate !== todayDateStr) {
+      user.adsWatchedToday = 0;
+      user.completedTaskIds = [];
+      user.lastActiveDate = todayDateStr;
+    }
+
+    const task = serverTasks.find((t) => t.id === taskId);
+    const maxDailyLimit = incomeMethodsConfig?.ads?.dailyLimit || user.dailyAdLimit || 40;
+
+    if ((user.adsWatchedToday || 0) >= maxDailyLimit) {
+      return res.status(400).json({
+        success: false,
+        error: `আজকের কাজের সর্বোচ্চ সীমা (${maxDailyLimit} টি) পূর্ণ হয়েছে! আগামী কাল আবার চেষ্টা করুন।`,
+      });
+    }
+
+    if (taskId && user.completedTaskIds && user.completedTaskIds.includes(taskId)) {
+      return res.status(400).json({
+        success: false,
+        error: "আপনি আজকের জন্য এই কাজটি ইতোমধ্যে সম্পন্ন করেছেন!",
+      });
+    }
+
+    // Authoritative duration: priority task.timerSeconds, fallback duration or 30s
+    let durationNum = 30;
+    if (task && typeof task.timerSeconds === 'number' && task.timerSeconds > 0) {
+      durationNum = Math.max(5, task.timerSeconds);
+    } else if (Number(duration) > 0) {
+      durationNum = Math.max(5, Number(duration));
+    }
+
+    const targetUrl = task?.destinationUrl || directAdUrl || incomeMethodsConfig?.ads?.directAdUrl || "https://researchingsweatexit.com/fx4s1179?key=795515765851a303657a3188bb3b9a45";
+
+    const sessionId = `adsess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}_${Math.random().toString(36).substring(2, 6)}`;
+    const token = `adtok_${Date.now()}_${Math.random().toString(36).substring(2, 12)}`;
+
     activeAdSessions[sessionId] = {
+      sessionId,
+      token,
       userId: user.id,
       taskId: taskId || 'general_ad',
-      duration: durationNum,
+      requiredDuration: durationNum,
       startedAt: Date.now(),
+      lastHeartbeatAt: Date.now(),
+      activeViewingSeconds: 0,
+      isPaused: false,
       completed: false,
+      claimed: false,
+      expiresAt: Date.now() + 15 * 60 * 1000, // 15 minutes session expiry
     };
 
     res.json({
       success: true,
       sessionId,
+      token,
       duration: durationNum,
-      directAdUrl: directAdUrl || incomeMethodsConfig?.ads?.directAdUrl || "https://researchingsweatexit.com/fx4s1179?key=795515765851a303657a3188bb3b9a45",
+      directAdUrl: targetUrl,
       startedAt: activeAdSessions[sessionId].startedAt,
     });
   });
 
-  // Verify Ad Viewing Session
-  app.post("/api/ad-session/verify", (req, res) => {
+  // Heartbeat endpoint for active session tracking
+  app.post("/api/ad-session/heartbeat", (req, res) => {
     const user = getRequestUser(req);
-    const { sessionId, taskId } = req.body || {};
+    const { sessionId, token, isActive } = req.body || {};
 
     if (!sessionId || !activeAdSessions[sessionId]) {
       return res.status(400).json({
@@ -1654,22 +1716,142 @@ async function startServer() {
       });
     }
 
-    if (session.completed) {
+    if (token && session.token !== token) {
+      return res.status(403).json({
+        success: false,
+        error: "অবৈধ সেশন টোকেন!",
+      });
+    }
+
+    if (Date.now() > session.expiresAt) {
+      return res.status(400).json({
+        success: false,
+        error: "বিজ্ঞাপন দেখার সময় উত্তীর্ণ (Expired) হয়েছে! দয়া করে নতুন করে শুরু করুন।",
+      });
+    }
+
+    if (session.claimed) {
       return res.status(400).json({
         success: false,
         error: "এই বিজ্ঞাপনের রিওয়ার্ড ইতোমধ্যে গ্রহণ করা হয়েছে!",
       });
     }
 
-    // Server-side timing check
-    const elapsedSeconds = Math.floor((Date.now() - session.startedAt) / 1000);
-    const minRequired = Math.max(1, session.duration - 2); // 2s network buffer
+    const now = Date.now();
+    if (isActive === false) {
+      session.isPaused = true;
+      session.lastHeartbeatAt = now;
+    } else {
+      if (session.isPaused) {
+        // Just resumed from pause
+        session.isPaused = false;
+        session.lastHeartbeatAt = now;
+      } else {
+        const elapsed = (now - session.lastHeartbeatAt) / 1000;
+        // Anti-cheat limit: cap active delta to at most 2.5 seconds per heartbeat tick
+        const validDelta = Math.max(0, Math.min(elapsed, 2.5));
+        session.activeViewingSeconds += validDelta;
+        session.lastHeartbeatAt = now;
+      }
 
-    if (elapsedSeconds < minRequired) {
+      if (session.activeViewingSeconds >= session.requiredDuration) {
+        session.completed = true;
+      }
+    }
+
+    const remaining = Math.max(0, Math.ceil(session.requiredDuration - session.activeViewingSeconds));
+
+    res.json({
+      success: true,
+      activeSeconds: Math.floor(session.activeViewingSeconds),
+      remainingSeconds: remaining,
+      isPaused: session.isPaused,
+      isCompleted: session.completed,
+    });
+  });
+
+  // Explicit Pause Session
+  app.post("/api/ad-session/pause", (req, res) => {
+    const user = getRequestUser(req);
+    const { sessionId, token } = req.body || {};
+    if (sessionId && activeAdSessions[sessionId]) {
+      const session = activeAdSessions[sessionId];
+      if (session.userId === user.id && (!token || session.token === token)) {
+        session.isPaused = true;
+        session.lastHeartbeatAt = Date.now();
+        return res.json({
+          success: true,
+          isPaused: true,
+          activeSeconds: Math.floor(session.activeViewingSeconds),
+          remainingSeconds: Math.max(0, Math.ceil(session.requiredDuration - session.activeViewingSeconds)),
+        });
+      }
+    }
+    res.json({ success: false });
+  });
+
+  // Explicit Resume Session
+  app.post("/api/ad-session/resume", (req, res) => {
+    const user = getRequestUser(req);
+    const { sessionId, token } = req.body || {};
+    if (sessionId && activeAdSessions[sessionId]) {
+      const session = activeAdSessions[sessionId];
+      if (session.userId === user.id && (!token || session.token === token)) {
+        session.isPaused = false;
+        session.lastHeartbeatAt = Date.now();
+        return res.json({
+          success: true,
+          isPaused: false,
+          activeSeconds: Math.floor(session.activeViewingSeconds),
+          remainingSeconds: Math.max(0, Math.ceil(session.requiredDuration - session.activeViewingSeconds)),
+        });
+      }
+    }
+    res.json({ success: false });
+  });
+
+  // Verify Ad Viewing Session
+  app.post("/api/ad-session/verify", (req, res) => {
+    const user = getRequestUser(req);
+    const { sessionId, token, taskId } = req.body || {};
+
+    if (!sessionId || !activeAdSessions[sessionId]) {
       return res.status(400).json({
         success: false,
-        error: `বিজ্ঞাপন সম্পূর্ণ সময় দেখা হয়নি! এখনো ${session.duration - elapsedSeconds} সেকেন্ড বাকি। সম্পূর্ণ সময় সক্রিয়ভাবে দেখুন।`,
-        remainingSeconds: Math.max(0, session.duration - elapsedSeconds),
+        error: "বিজ্ঞাপন সেশন পাওয়া যায়নি! নতুন করে বিজ্ঞাপন দেখুন।",
+      });
+    }
+
+    const session = activeAdSessions[sessionId];
+    if (session.userId !== user.id) {
+      return res.status(403).json({
+        success: false,
+        error: "অননুমোদিত সেশন!",
+      });
+    }
+
+    if (token && session.token !== token) {
+      return res.status(403).json({
+        success: false,
+        error: "অবৈধ সেশন টোকেন!",
+      });
+    }
+
+    if (session.claimed) {
+      return res.status(400).json({
+        success: false,
+        error: "এই বিজ্ঞাপনের রিওয়ার্ড ইতোমধ্যে গ্রহণ করা হয়েছে (Replay Protection)!",
+      });
+    }
+
+    // Authoritative active viewing time check
+    const minRequired = Math.max(1, session.requiredDuration - 1.5); // 1.5s network jitter tolerance
+    if (session.activeViewingSeconds < minRequired) {
+      const remainingSeconds = Math.max(1, Math.ceil(session.requiredDuration - session.activeViewingSeconds));
+      return res.status(400).json({
+        success: false,
+        error: `বিজ্ঞাপন সম্পূর্ণ সময় দেখা হয়নি! এখনো ${remainingSeconds} সেকেন্ড বাকি। সম্পূর্ণ সময় সক্রিয়ভাবে দেখুন।`,
+        remainingSeconds,
       });
     }
 
@@ -1678,6 +1860,7 @@ async function startServer() {
       success: true,
       verified: true,
       sessionId,
+      token: session.token,
       message: "সফলভাবে বিজ্ঞাপন দেখা ভেরিফাই হয়েছে!",
     });
   });
@@ -1685,21 +1868,8 @@ async function startServer() {
   // User: Complete a task and receive reward
   app.post("/api/tasks/complete", (req, res) => {
     const user = getRequestUser(req);
-    const { taskId, rewardUsd, sessionId } = req.body || {};
+    const { taskId, rewardUsd, sessionId, token } = req.body || {};
     const todayDateStr = new Date(Date.now() + 6 * 3600 * 1000).toISOString().slice(0, 10);
-
-    // If session ID provided, verify server-side duration
-    if (sessionId && activeAdSessions[sessionId]) {
-      const session = activeAdSessions[sessionId];
-      const elapsedSeconds = Math.floor((Date.now() - session.startedAt) / 1000);
-      const minRequired = Math.max(1, session.duration - 2);
-      if (elapsedSeconds < minRequired && !session.completed) {
-        return res.status(400).json({
-          error: `বিজ্ঞাপন দেখার সময় পূর্ণ হয়নি! সম্পূর্ণ ${session.duration} সেকেন্ড সক্রিয়ভাবে দেখতে হবে।`,
-        });
-      }
-      session.completed = true;
-    }
 
     // If date changed, reset daily counter
     if (user.lastActiveDate && user.lastActiveDate !== todayDateStr) {
@@ -1719,24 +1889,69 @@ async function startServer() {
 
     if (!user.completedTaskIds) user.completedTaskIds = [];
     const alreadyDone = user.completedTaskIds.includes(taskId);
-    if (!alreadyDone) {
-      user.completedTaskIds.push(taskId);
-      const earned = Number(task?.rewardUsd || rewardUsd || 0.0125);
-      user.balanceUsd = +(Number(user.balanceUsd || 0) + earned).toFixed(4);
-      user.adsWatchedToday = (user.adsWatchedToday || 0) + 1;
-      if (task) {
-        task.totalCompletions = (task.totalCompletions || 0) + 1;
-        saveJsonFile("tasks.json", serverTasks);
-      }
-      saveJsonFile("users.json", usersMap);
+    if (alreadyDone) {
+      return res.json({
+        success: true,
+        alreadyCompleted: true,
+        user,
+        task,
+        rewardUsd: 0,
+      });
     }
+
+    // Strict Server-Side Active Viewing Verification for tasks with timer / ad session
+    if (sessionId) {
+      const session = activeAdSessions[sessionId];
+      if (!session) {
+        return res.status(400).json({
+          error: "বিজ্ঞাপন ভেরিফিকেশন সেশন পাওয়া যায়নি! দয়া করে সম্পূর্ণ বিজ্ঞাপন দেখুন।",
+        });
+      }
+      if (session.userId !== user.id) {
+        return res.status(403).json({ error: "অননুমোদিত বিজ্ঞাপন সেশন!" });
+      }
+      if (token && session.token !== token) {
+        return res.status(403).json({ error: "অবৈধ সেশন টোকেন!" });
+      }
+      if (session.claimed) {
+        return res.status(400).json({
+          error: "এই বিজ্ঞাপনের রিওয়ার্ড ইতোমধ্যে গ্রহণ করা হয়েছে (Replay Protection)!",
+        });
+      }
+      const minRequired = Math.max(1, session.requiredDuration - 1.5);
+      if (session.activeViewingSeconds < minRequired) {
+        const remaining = Math.max(1, Math.ceil(session.requiredDuration - session.activeViewingSeconds));
+        return res.status(400).json({
+          error: `বিজ্ঞাপন দেখার সময় পূর্ণ হয়নি! সম্পূর্ণ ${session.requiredDuration} সেকেন্ড সক্রিয়ভাবে দেখতে হবে (বাকি: ${remaining}s)।`,
+        });
+      }
+      // Burn the session so it can never be used again
+      session.claimed = true;
+      session.completed = true;
+    } else if (task && ((task.timerSeconds && task.timerSeconds > 0) || task.category === 'ads' || task.category === 'visit')) {
+      // If task has a timer or is an ad/visit task, a verified session is strictly required!
+      return res.status(400).json({
+        error: `এই কাজটি সম্পন্ন করতে বাধ্যতামূলক বিজ্ঞাপন ভেরিফিকেশন সেশন আবশ্যক! সম্পূর্ণ ${task.timerSeconds || 30} সেকেন্ড সক্রিয়ভাবে দেখুন।`,
+      });
+    }
+
+    user.completedTaskIds.push(taskId);
+    const earned = Number(task?.rewardUsd || rewardUsd || 0.0125);
+    user.balanceUsd = +(Number(user.balanceUsd || 0) + earned).toFixed(4);
+    user.adsWatchedToday = (user.adsWatchedToday || 0) + 1;
+    if (task) {
+      task.totalCompletions = (task.totalCompletions || 0) + 1;
+      saveJsonFile("tasks.json", serverTasks);
+    }
+    saveJsonFile("users.json", usersMap);
 
     res.json({
       success: true,
-      alreadyCompleted: alreadyDone,
+      alreadyCompleted: false,
       user,
       task,
-      rewardUsd: task?.rewardUsd || rewardUsd || 0.0125,
+      rewardUsd: earned,
+      rewardBdt: +(earned * 120).toFixed(2),
     });
   });
 

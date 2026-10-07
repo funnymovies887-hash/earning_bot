@@ -33,7 +33,7 @@ interface EarnTabProps {
   user: UserProfile;
   language: Language;
   onWatchAd: () => void;
-  onCompleteTask: (taskId: string, rewardUsd: number, type: string) => void;
+  onCompleteTask: (taskId: string, rewardUsd: number, type: string, sessionId?: string, token?: string) => void;
   onOpenOfficialNotice: () => void;
   onTabChange?: (tab: 'home' | 'refer' | 'earn' | 'rank' | 'profile') => void;
   initialSubTab?: 'ads' | 'visit' | 'telegram' | 'mission' | 'referral';
@@ -1076,8 +1076,8 @@ export const EarnTab: React.FC<EarnTabProps> = ({
           rewardUsd={runningAdModalTask.rewardUsd}
           taskId={runningAdModalTask.id}
           directAdUrl={runningAdModalTask.destinationUrl || 'https://researchingsweatexit.com/fx4s1179?key=795515765851a303657a3188bb3b9a45'}
-          onClaimReward={() => {
-            onCompleteTask(runningAdModalTask.id, runningAdModalTask.rewardUsd, runningAdModalTask.category);
+          onClaimReward={(sessionId, token) => {
+            onCompleteTask(runningAdModalTask.id, runningAdModalTask.rewardUsd, runningAdModalTask.category, sessionId, token);
             setRunningAdModalTask(null);
           }}
         />

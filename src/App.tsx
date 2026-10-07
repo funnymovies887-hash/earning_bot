@@ -789,48 +789,78 @@ export default function App() {
   };
 
   // Complete Task (5 Income Methods Tasks - Counts towards daily 40 limit)
-  const handleCompleteTask = React.useCallback((taskId: string, rewardUsd: number, type: string) => {
-    const maxDailyLimit = incomeConfig?.ads?.dailyLimit || user.dailyAdLimit || 40;
-    if ((user.adsWatchedToday || 0) >= maxDailyLimit) {
-      addNotification({
-        id: 'limit-err-' + Date.now(),
-        title: '⚠️ আজকের কাজের লিমিট পূর্ণ',
-        body: `আজকের সর্বোচ্চ কাজের লিমিট (${maxDailyLimit} টি) পূর্ণ হয়েছে। আগামী কাল আবার কাজ করতে পারবেন।`,
-      });
-      return;
-    }
+  const handleCompleteTask = React.useCallback(
+    (taskId: string, rewardUsd: number, type: string, sessionId?: string, token?: string) => {
+      const maxDailyLimit = incomeConfig?.ads?.dailyLimit || user.dailyAdLimit || 40;
+      if ((user.adsWatchedToday || 0) >= maxDailyLimit) {
+        addNotification({
+          id: 'limit-err-' + Date.now(),
+          title: '⚠️ আজকের কাজের লিমিট পূর্ণ',
+          body: `আজকের সর্বোচ্চ কাজের লিমিট (${maxDailyLimit} টি) পূর্ণ হয়েছে। আগামী কাল আবার কাজ করতে পারবেন।`,
+        });
+        return;
+      }
 
-    const validReward = typeof rewardUsd === 'number' && !isNaN(rewardUsd) ? rewardUsd : 0.0125;
-    const currentCompleted = user.completedTaskIds || [];
-    if (currentCompleted.includes(taskId)) return;
+      const validReward = typeof rewardUsd === 'number' && !isNaN(rewardUsd) ? rewardUsd : 0.0125;
+      const currentCompleted = user.completedTaskIds || [];
+      if (currentCompleted.includes(taskId)) return;
 
-    const nextCount = (user.adsWatchedToday || 0) + 1;
-    const updatedTasks = [...currentCompleted, taskId];
-    syncUser({
-      balanceUsd: +(Number(user.balanceUsd || 0) + validReward).toFixed(4),
-      completedTaskIds: updatedTasks,
-      adsWatchedToday: nextCount,
-    });
+      // Submit completion with server-authoritative session token verification
+      fetch('/api/tasks/complete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user.id,
+        },
+        body: JSON.stringify({
+          taskId,
+          rewardUsd: validReward,
+          sessionId,
+          token,
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success) {
+            const nextCount = (user.adsWatchedToday || 0) + 1;
+            const updatedTasks = [...currentCompleted, taskId];
+            const newBalance =
+              data.user?.balanceUsd ?? +(Number(user.balanceUsd || 0) + validReward).toFixed(4);
 
-    // Notify server to increment totalCompletions by 1 for this exact task
-    fetch('/api/tasks/complete', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': user.id,
-      },
-      body: JSON.stringify({ taskId }),
-    }).catch(() => {});
+            syncUser({
+              balanceUsd: newBalance,
+              completedTaskIds: updatedTasks,
+              adsWatchedToday: data.user?.adsWatchedToday ?? nextCount,
+            });
 
-    const bdtAmount = +(validReward * 120).toFixed(2);
-    addInboxNotification({
-      id: 'task-' + Date.now(),
-      type: 'task',
-      title: '✅ ১টি কাজ সফলভাবে সম্পন্ন হয়েছে!',
-      body: `আপনি এই কাজটি সম্পন্ন করে +৳${bdtAmount} ($${validReward.toFixed(4)}) পেয়েছেন! (${nextCount}/${maxDailyLimit})`,
-      details: `টাস্ক আইডি: ${taskId}\nক্যাটাগরি: ${type.toUpperCase()}\nপারিশ্রমিক: ৳${bdtAmount} BDT ($${validReward} USD)\nআজকের সম্পন্ন কাজ: ${nextCount}/${maxDailyLimit} টি\nটাকা তাৎক্ষণিকভাবে আপনার মূল অ্যাকাউন্টে যোগ করা হয়েছে।`,
-    });
-  }, [incomeConfig, user, syncUser]);
+            const bdtAmount = +(validReward * 120).toFixed(2);
+            addInboxNotification({
+              id: 'task-' + Date.now(),
+              type: 'task',
+              title: '✅ ১টি কাজ সফলভাবে সম্পন্ন হয়েছে!',
+              body: `আপনি এই কাজটি সম্পন্ন করে +৳${bdtAmount} ($${validReward.toFixed(4)}) পেয়েছেন! (${nextCount}/${maxDailyLimit})`,
+              details: `টাস্ক আইডি: ${taskId}\nক্যাটাগরি: ${type.toUpperCase()}\nপারিশ্রমিক: ৳${bdtAmount} BDT ($${validReward} USD)\nআজকের সম্পন্ন কাজ: ${nextCount}/${maxDailyLimit} টি\nটাকা তাৎক্ষণিকভাবে আপনার মূল অ্যাকাউন্টে যোগ করা হয়েছে।`,
+            });
+          } else {
+            addNotification({
+              id: 'task-err-' + Date.now(),
+              title: '⚠️ কাজ সম্পন্ন ব্যর্থ',
+              body: data.error || 'বিজ্ঞাপন সম্পূর্ণ সময় দেখা হয়নি!',
+            });
+          }
+        })
+        .catch(() => {
+          const nextCount = (user.adsWatchedToday || 0) + 1;
+          const updatedTasks = [...currentCompleted, taskId];
+          syncUser({
+            balanceUsd: +(Number(user.balanceUsd || 0) + validReward).toFixed(4),
+            completedTaskIds: updatedTasks,
+            adsWatchedToday: nextCount,
+          });
+        });
+    },
+    [incomeConfig, user, syncUser]
+  );
 
   // Referral tier claim
   const handleClaimTier = (tierIndex: number, rewardUsd: number) => {
@@ -1239,23 +1269,39 @@ export default function App() {
             rewardBdt={adWatchingSession.rewardBdt}
             rewardUsd={adWatchingSession.rewardUsd}
             directAdUrl={adWatchingSession.directAdUrl}
-            onClaimReward={(sessId) => {
+            taskId="general_ad"
+            onClaimReward={(sessId, tok) => {
               const maxDailyLimit = incomeConfig?.ads?.dailyLimit || user.dailyAdLimit || 40;
               const nextCount = (user.adsWatchedToday || 0) + 1;
-              syncUser({
-                balanceUsd: +(user.balanceUsd + adWatchingSession.rewardUsd).toFixed(4),
-                adsWatchedToday: nextCount,
-              });
               fetch('/api/tasks/complete', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-user-id': user.id,
+                },
                 body: JSON.stringify({
                   taskId: 'ad-watch-' + Date.now(),
                   rewardUsd: adWatchingSession.rewardUsd,
                   type: 'ad',
                   sessionId: sessId,
+                  token: tok,
                 }),
-              }).catch(() => {});
+              })
+                .then((r) => r.json())
+                .then((d) => {
+                  if (d.success) {
+                    syncUser({
+                      balanceUsd: d.user?.balanceUsd ?? +(user.balanceUsd + adWatchingSession.rewardUsd).toFixed(4),
+                      adsWatchedToday: d.user?.adsWatchedToday ?? nextCount,
+                    });
+                  }
+                })
+                .catch(() => {
+                  syncUser({
+                    balanceUsd: +(user.balanceUsd + adWatchingSession.rewardUsd).toFixed(4),
+                    adsWatchedToday: nextCount,
+                  });
+                });
               addInboxNotification({
                 id: 'direct-ad-' + Date.now(),
                 type: 'ad_locked',
