@@ -221,6 +221,47 @@
         }
       })();
     </script>
+    <script>
+      // Global Anti-Crash Interceptor for 3rd-party Ad SDK errors (e.g. Monetag adex timeout, no fill, network lag)
+      (function() {
+        window.addEventListener('unhandledrejection', function(event) {
+          try {
+            var reason = event.reason;
+            var msg = (reason && (reason.message || reason.stack || String(reason))) || '';
+            if (
+              msg.indexOf('adex timeout') !== -1 ||
+              msg.indexOf('adex') !== -1 ||
+              msg.indexOf('libtl.com') !== -1 ||
+              msg.indexOf('monetag') !== -1 ||
+              msg.indexOf('show_11898539') !== -1
+            ) {
+              console.warn('[Ad SDK Handled] Suppressed 3rd-party ad rejection:', msg);
+              event.preventDefault();
+              event.stopImmediatePropagation();
+              return true;
+            }
+          } catch(e) {}
+        });
+
+        window.addEventListener('error', function(event) {
+          try {
+            var msg = (event.message || '') + ' ' + (event.filename || '');
+            if (
+              msg.indexOf('adex timeout') !== -1 ||
+              msg.indexOf('adex') !== -1 ||
+              msg.indexOf('libtl.com') !== -1 ||
+              msg.indexOf('monetag') !== -1 ||
+              msg.indexOf('show_11898539') !== -1
+            ) {
+              console.warn('[Ad SDK Handled] Suppressed 3rd-party ad error:', msg);
+              event.preventDefault();
+              event.stopImmediatePropagation();
+              return true;
+            }
+          } catch(e) {}
+        });
+      })();
+    </script>
     <!-- Monetag Telegram Mini App Ads SDK (Zone 11898539) -->
     <script src="//libtl.com/sdk.js" data-zone="11898539" data-sdk="show_11898539" async></script>
   </head>

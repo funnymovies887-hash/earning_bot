@@ -32,6 +32,29 @@ export function isAdSuppressed(): boolean {
   return false;
 }
 
+// Global Anti-Crash Interceptor for ad network timeouts & no-fill events
+if (typeof window !== 'undefined') {
+  window.addEventListener('unhandledrejection', (event) => {
+    try {
+      const reason = event.reason;
+      const msg = (reason && (reason.message || reason.stack || String(reason))) || '';
+      if (
+        msg.includes('adex timeout') ||
+        msg.includes('adex') ||
+        msg.includes('libtl.com') ||
+        msg.includes('monetag') ||
+        msg.includes('show_11898539')
+      ) {
+        console.warn('[Monetag Anti-Crash] Handled 3rd-party ad rejection:', msg);
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    } catch {
+      // ignore
+    }
+  });
+}
+
 /**
  * Initialize In-App Interstitial Ads for general users.
  * Settings match user specification:
@@ -51,7 +74,7 @@ export function initMonetagInAppAds() {
     window.show_11898539.inAppInitialized = true;
 
     try {
-      window.show_11898539({
+      const res = window.show_11898539({
         type: 'inApp',
         inAppSettings: {
           frequency: 4,
@@ -61,6 +84,12 @@ export function initMonetagInAppAds() {
           everyPage: false,
         },
       });
+
+      if (res && typeof res.catch === 'function') {
+        res.catch((err: any) => {
+          console.warn('[Monetag] Handled in-app interstitial ad timeout / error:', err);
+        });
+      }
       console.log('[Monetag] In-App Interstitial initialized (2-minute interval)');
     } catch (e) {
       console.warn('[Monetag] Failed to initialize inApp ads:', e);
@@ -88,14 +117,26 @@ export async function showMonetagRewardedAd(): Promise<boolean> {
     // 1. Try Rewarded Interstitial format first
     try {
       console.log('[Monetag] Executing Rewarded Interstitial show_11898539()...');
-      await fn();
+      const p = fn();
+      if (p && typeof p.catch === 'function') {
+        p.catch((e: any) => {
+          console.warn('[Monetag] Handled interstitial promise catch:', e);
+        });
+      }
+      await p;
       console.log('[Monetag] Rewarded Interstitial finished successfully!');
       return true;
     } catch (err) {
       console.warn('[Monetag] Rewarded Interstitial error, falling back to Rewarded Popup:', err);
       // 2. Fallback to Rewarded Popup format
       try {
-        await fn('pop');
+        const popP = fn('pop');
+        if (popP && typeof popP.catch === 'function') {
+          popP.catch((e: any) => {
+            console.warn('[Monetag] Handled pop promise catch:', e);
+          });
+        }
+        await popP;
         console.log('[Monetag] Rewarded Popup finished successfully!');
         return true;
       } catch (popErr) {
