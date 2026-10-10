@@ -213,6 +213,9 @@ export interface DigitalPackage {
   originalPriceBdt?: number;
   discountBadge?: string;
   isSpecialOffer?: boolean;
+  offerDurationDays?: number; // e.g. 7
+  offerExpiresAt?: number; // timestamp in ms when offer expires
+  offerStartDate?: string;
   thumbnail: string;
   downloadUrl: string; // Secret software/video link revealed upon approval
   previewUrl?: string;

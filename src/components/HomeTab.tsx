@@ -16,6 +16,7 @@ import {
   Sparkles,
   ArrowRight,
   ShieldCheck,
+  Flame,
 } from 'lucide-react';
 import { UserProfile, VideoItem, Language, AdLockedVideo } from '../types';
 import { TRANSLATIONS } from '../i18n';
@@ -262,17 +263,20 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                 <ShoppingBag className="w-6 h-6 text-amber-100" />
               </div>
               <div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-[10px] font-black uppercase tracking-wider bg-black/30 px-2 py-0.5 rounded-full border border-white/20">
                     VIP Store
                   </span>
-                  <span className="text-[10px] font-bold text-amber-200">বিকাশ/নগদ ম্যানুয়াল অনুমোদন</span>
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-rose-600 to-amber-500 text-white px-2 py-0.5 rounded-full border border-amber-300/60 flex items-center gap-1 shadow-xs animate-pulse">
+                    <Flame className="w-3 h-3 fill-amber-300 text-amber-300" />
+                    ৭ দিনের স্পেশাল অফার 🔥
+                  </span>
                 </div>
                 <h3 className="font-extrabold text-sm text-white tracking-tight mt-0.5">
                   সফটওয়্যার, বট স্ক্রিপ্ট ও কোর্স কিনুন
                 </h3>
                 <p className="text-[11px] text-amber-100/90 line-clamp-1">
-                  অর্ডার করুন এবং এডমিন অনুমোদনের পর সাথে সাথে ডাউনলোড পান
+                  সীমিত সময়ের স্পেশাল অফার চলছে — মাত্র ২৫ টাকায় প্রিমিয়াম সফটওয়্যার!
                 </p>
               </div>
             </div>

@@ -34,6 +34,65 @@
         -webkit-tap-highlight-color: transparent !important;
       }
     </style>
+    <!-- Global Anti-Crash Interceptor for 3rd-party Ad SDK errors (e.g. Monetag adex timeout, no fill, network lag) -->
+    <script>
+      (function() {
+        function shouldSuppress(msg) {
+          if (!msg) return false;
+          var str = String(msg).toLowerCase();
+          return (
+            str.indexOf('adex timeout') !== -1 ||
+            str.indexOf('adex') !== -1 ||
+            str.indexOf('libtl.com') !== -1 ||
+            str.indexOf('monetag') !== -1 ||
+            str.indexOf('show_11898539') !== -1
+          );
+        }
+
+        window.addEventListener('unhandledrejection', function(event) {
+          try {
+            var reason = event.reason;
+            var msg = (reason && (reason.message || reason.stack || String(reason))) || '';
+            if (shouldSuppress(msg)) {
+              console.warn('[Ad SDK Handled] Suppressed 3rd-party ad rejection:', msg);
+              event.preventDefault();
+              event.stopPropagation();
+              if (typeof event.stopImmediatePropagation === 'function') {
+                event.stopImmediatePropagation();
+              }
+              return true;
+            }
+          } catch(e) {}
+        }, true);
+
+        window.addEventListener('error', function(event) {
+          try {
+            var msg = (event.message || '') + ' ' + (event.filename || '');
+            if (shouldSuppress(msg)) {
+              console.warn('[Ad SDK Handled] Suppressed 3rd-party ad error:', msg);
+              event.preventDefault();
+              event.stopPropagation();
+              if (typeof event.stopImmediatePropagation === 'function') {
+                event.stopImmediatePropagation();
+              }
+              return true;
+            }
+          } catch(e) {}
+        }, true);
+
+        var origOnError = window.onerror;
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+          var text = (msg || '') + ' ' + (url || '') + ' ' + (error && (error.message || error.stack) || '');
+          if (shouldSuppress(text)) {
+            console.warn('[Ad SDK Handled] Suppressed window.onerror ad error:', text);
+            return true;
+          }
+          if (typeof origOnError === 'function') {
+            return origOnError.apply(this, arguments);
+          }
+        };
+      })();
+    </script>
     <!-- Pre-init Telegram WebApp version hook: ensures sessionStorage sets version 9.0 BEFORE telegram-web-app.js evaluates closure variables -->
     <script>
       (function() {
@@ -219,47 +278,6 @@
         } catch(err) {
           console.warn('[WebApp] CloudStorage polyfill setup note:', err);
         }
-      })();
-    </script>
-    <script>
-      // Global Anti-Crash Interceptor for 3rd-party Ad SDK errors (e.g. Monetag adex timeout, no fill, network lag)
-      (function() {
-        window.addEventListener('unhandledrejection', function(event) {
-          try {
-            var reason = event.reason;
-            var msg = (reason && (reason.message || reason.stack || String(reason))) || '';
-            if (
-              msg.indexOf('adex timeout') !== -1 ||
-              msg.indexOf('adex') !== -1 ||
-              msg.indexOf('libtl.com') !== -1 ||
-              msg.indexOf('monetag') !== -1 ||
-              msg.indexOf('show_11898539') !== -1
-            ) {
-              console.warn('[Ad SDK Handled] Suppressed 3rd-party ad rejection:', msg);
-              event.preventDefault();
-              event.stopImmediatePropagation();
-              return true;
-            }
-          } catch(e) {}
-        });
-
-        window.addEventListener('error', function(event) {
-          try {
-            var msg = (event.message || '') + ' ' + (event.filename || '');
-            if (
-              msg.indexOf('adex timeout') !== -1 ||
-              msg.indexOf('adex') !== -1 ||
-              msg.indexOf('libtl.com') !== -1 ||
-              msg.indexOf('monetag') !== -1 ||
-              msg.indexOf('show_11898539') !== -1
-            ) {
-              console.warn('[Ad SDK Handled] Suppressed 3rd-party ad error:', msg);
-              event.preventDefault();
-              event.stopImmediatePropagation();
-              return true;
-            }
-          } catch(e) {}
-        });
       })();
     </script>
     <!-- Monetag Telegram Mini App Ads SDK (Zone 11898539) -->

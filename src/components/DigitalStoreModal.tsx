@@ -29,6 +29,11 @@ import {
   Shield,
   Smartphone,
   CheckCircle,
+  Flame,
+  Zap,
+  Timer,
+  Percent,
+  Gift,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { DigitalPackage, PackageOrder, PaymentNumbersConfig, UserProfile } from '../types';
@@ -69,6 +74,18 @@ export const DigitalStoreModal: React.FC<DigitalStoreModalProps> = ({
   const [paymentConfig, setPaymentConfig] = useState<PaymentNumbersConfig | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Live countdown clock ticker (updates every second for real-time countdown accuracy)
+  const [now, setNow] = useState<number>(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Dedicated Special Offer Pop-up Modal state for when user clicks on a package
+  const [specialOfferPopupPkg, setSpecialOfferPopupPkg] = useState<DigitalPackage | null>(null);
 
   const [selectedDetailPkg, setSelectedDetailPkg] = useState<DigitalPackage | null>(null);
   const [checkoutPkg, setCheckoutPkg] = useState<DigitalPackage | null>(null);
@@ -174,12 +191,44 @@ export const DigitalStoreModal: React.FC<DigitalStoreModalProps> = ({
 
   if (!isOpen) return null;
 
-  const categories = ['All', 'Software', 'Video Course', 'Bot Script', 'Tools & Files'];
+  // Real-time live countdown timer helper for any package
+  const getOfferCountdown = (pkg: DigitalPackage | null | undefined) => {
+    if (!pkg || !pkg.isSpecialOffer) return null;
+    const expiresAt = pkg.offerExpiresAt && Number(pkg.offerExpiresAt) > 0
+      ? Number(pkg.offerExpiresAt)
+      : now + (pkg.offerDurationDays || 7) * 24 * 60 * 60 * 1000;
+    const diff = Math.max(0, expiresAt - now);
+    const isExpired = diff <= 0;
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+    const formattedBn = `${toLocalizedDigits(String(days))} দিন ${toLocalizedDigits(String(hours).padStart(2, '0'))} ঘণ্টা ${toLocalizedDigits(String(minutes).padStart(2, '0'))} মি ${toLocalizedDigits(String(seconds).padStart(2, '0'))} সে`;
+    const formattedShort = `${days}d ${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`;
+
+    return {
+      diff,
+      isExpired,
+      days,
+      hours,
+      minutes,
+      seconds,
+      formattedBn,
+      formattedShort,
+    };
+  };
+
+  const categories = ['All', '🔥 Special Offers', 'Software', 'Video Course', 'Bot Script', 'Tools & Files'];
 
   const filteredPackages = packages.filter((p) => {
     if (selectedCategory === 'All') return true;
+    if (selectedCategory === '🔥 Special Offers') return Boolean(p.isSpecialOffer);
     return p.category === selectedCategory;
   });
+
+  const specialOfferPackages = packages.filter((p) => Boolean(p.isSpecialOffer));
 
   const handleCopy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -345,6 +394,52 @@ export const DigitalStoreModal: React.FC<DigitalStoreModalProps> = ({
             {/* View 1: Store Catalog */}
             {activeView === 'store' && !checkoutPkg && !selectedDetailPkg && (
               <>
+                {/* Active Special Offer Announcement Banner with Real Live Countdown */}
+                {specialOfferPackages.length > 0 && (
+                  <div
+                    onClick={() => {
+                      if (selectedCategory === '🔥 Special Offers') {
+                        setSpecialOfferPopupPkg(specialOfferPackages[0]);
+                      } else {
+                        setSelectedCategory('🔥 Special Offers');
+                      }
+                    }}
+                    className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-600 via-rose-600 to-purple-700 p-3.5 text-white shadow-xl border border-amber-400/60 cursor-pointer active:scale-98 transition-all group"
+                  >
+                    <div className="absolute -right-4 -bottom-6 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none" />
+                    <div className="flex items-center justify-between gap-2 relative z-10">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-2xl bg-black/30 backdrop-blur-md border border-white/20 flex items-center justify-center text-amber-300 shrink-0 group-hover:scale-105 transition-transform">
+                          <Flame className="w-6 h-6 fill-amber-400 text-amber-400 animate-bounce" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] font-black uppercase tracking-wider bg-black/40 px-2 py-0.5 rounded-full border border-white/20 text-amber-200">
+                              মেগা স্পেশাল অফার
+                            </span>
+                            <span className="text-[10px] font-bold text-amber-100">
+                              {specialOfferPackages[0].offerDurationDays || 7} দিনের ধামাকা ছাড়
+                            </span>
+                          </div>
+                          <h4 className="font-black text-xs sm:text-sm text-white mt-0.5 truncate leading-tight">
+                            সফটওয়্যার ও প্যাকেজে সীমিত সময়ের অফার চলছে! 🔥
+                          </h4>
+                          <div className="flex items-center gap-1.5 text-[10px] text-amber-200 font-mono mt-0.5">
+                            <Clock className="w-3 h-3 text-amber-300 animate-spin" />
+                            <span>
+                              বাকি সময়: {getOfferCountdown(specialOfferPackages[0])?.formattedBn || 'চলছে'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="shrink-0 flex items-center gap-1 bg-white/20 hover:bg-white text-white hover:text-slate-900 px-3 py-1.5 rounded-xl font-black text-xs backdrop-blur-xs transition-colors shadow-sm">
+                        <span>অফার দেখুন</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Categories Filter Pills */}
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
                   {categories.map((cat) => (
@@ -358,6 +453,11 @@ export const DigitalStoreModal: React.FC<DigitalStoreModalProps> = ({
                       }`}
                     >
                       {cat}
+                      {cat === '🔥 Special Offers' && specialOfferPackages.length > 0 && (
+                        <span className="ml-1 px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[10px] font-black">
+                          {specialOfferPackages.length}
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -368,13 +468,42 @@ export const DigitalStoreModal: React.FC<DigitalStoreModalProps> = ({
                     const existingOrder = getPackageOrderStatus(pkg.id);
                     const isApproved = existingOrder?.status === 'Approved';
                     const isPending = existingOrder?.status === 'Pending';
+                    const isOffer = Boolean(pkg.isSpecialOffer);
+                    const offerCountdown = getOfferCountdown(pkg);
+                    const originalPrice = pkg.originalPriceBdt || (isOffer ? Math.round(pkg.priceBdt * 2) : undefined);
+                    const hasDiscount = Boolean(originalPrice && originalPrice > pkg.priceBdt);
+                    const savingsBdt = hasDiscount ? originalPrice! - pkg.priceBdt : 0;
 
                     return (
                       <div
                         key={pkg.id}
-                        onClick={() => handleOpenDetails(pkg)}
-                        className="bg-slate-800/90 border border-slate-700 hover:border-amber-400 hover:bg-slate-800 rounded-2xl p-4 transition-all duration-200 shadow-md space-y-3 relative group cursor-pointer"
+                        onClick={() => {
+                          if (isOffer) {
+                            setSpecialOfferPopupPkg(pkg);
+                          } else {
+                            handleOpenDetails(pkg);
+                          }
+                        }}
+                        className={`rounded-2xl p-4 transition-all duration-200 shadow-md space-y-3 relative group cursor-pointer ${
+                          isOffer
+                            ? 'bg-gradient-to-b from-slate-800/95 via-slate-850 to-amber-950/30 border-2 border-amber-400/90 hover:border-amber-300 shadow-amber-500/10 hover:shadow-amber-500/20'
+                            : 'bg-slate-800/90 border border-slate-700 hover:border-amber-400 hover:bg-slate-800'
+                        }`}
                       >
+                        {/* Top Special Offer Banner Strip on Card */}
+                        {isOffer && (
+                          <div className="flex items-center justify-between bg-gradient-to-r from-amber-500/25 via-rose-500/20 to-amber-500/25 border border-amber-500/50 rounded-xl px-2.5 py-1.5 text-xs shadow-xs">
+                            <div className="flex items-center gap-1.5 font-black text-amber-300 text-[11px]">
+                              <Flame className="w-3.5 h-3.5 fill-amber-400 text-amber-400 animate-pulse" />
+                              <span>স্পেশাল অফার ({pkg.offerDurationDays || 7} দিন)</span>
+                            </div>
+                            <div className="flex items-center gap-1 text-[10px] font-mono font-bold text-rose-300 bg-black/60 px-2 py-0.5 rounded-lg border border-rose-500/30">
+                              <Clock className="w-3 h-3 text-rose-400 animate-spin" />
+                              <span>{offerCountdown?.formattedBn || `${pkg.offerDurationDays || 7} দিন`}</span>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Header Area */}
                         <div className="flex items-start gap-3">
                           <div className="relative shrink-0">
@@ -387,8 +516,8 @@ export const DigitalStoreModal: React.FC<DigitalStoreModalProps> = ({
                               className="w-20 h-20 rounded-xl object-cover border border-slate-700 group-hover:border-purple-400 transition-colors"
                             />
                             <span className="absolute bottom-1 right-1 bg-black/80 text-[9px] font-bold text-amber-300 px-1.5 py-0.5 rounded flex items-center gap-0.5 shadow-sm">
-                              <Eye className="w-2.5 h-2.5 text-amber-400" />
-                              ডিটেইল
+                              {isOffer ? <Flame className="w-2.5 h-2.5 text-amber-400 fill-amber-400" /> : <Eye className="w-2.5 h-2.5 text-amber-400" />}
+                              {isOffer ? 'অফার' : 'ডিটেইল'}
                             </span>
                           </div>
 
@@ -408,17 +537,22 @@ export const DigitalStoreModal: React.FC<DigitalStoreModalProps> = ({
                             </h4>
 
                             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                              <span className="text-lg font-black text-amber-300">
+                              <span className="text-xl font-black text-amber-300">
                                 ৳{pkg.priceBdt}
                               </span>
-                              {pkg.originalPriceBdt && pkg.originalPriceBdt > pkg.priceBdt && (
-                                <span className="text-xs line-through text-slate-400 font-bold">
-                                  ৳{pkg.originalPriceBdt}
+                              {hasDiscount && (
+                                <del className="text-xs line-through text-slate-400 font-bold">
+                                  ৳{originalPrice}
+                                </del>
+                              )}
+                              {(pkg.discountBadge || hasDiscount) && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-rose-500 to-amber-500 text-white shadow-xs">
+                                  {pkg.discountBadge || `${Math.round((savingsBdt / originalPrice!) * 100)}% ছাড় 🔥`}
                                 </span>
                               )}
-                              {(pkg.discountBadge || (pkg.originalPriceBdt && pkg.originalPriceBdt > pkg.priceBdt)) && (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-rose-500 to-amber-500 text-white shadow-xs">
-                                  {pkg.discountBadge || `${Math.round(((pkg.originalPriceBdt! - pkg.priceBdt) / pkg.originalPriceBdt!) * 100)}% ছাড় 🔥`}
+                              {hasDiscount && (
+                                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-1.5 py-0.5 rounded">
+                                  ৳{savingsBdt} সাশ্রয়
                                 </span>
                               )}
                               <span className="text-xs font-semibold text-slate-400">
@@ -548,12 +682,25 @@ export const DigitalStoreModal: React.FC<DigitalStoreModalProps> = ({
                                 id={`view-details-${pkg.id}`}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleOpenDetails(pkg);
+                                  if (isOffer) {
+                                    setSpecialOfferPopupPkg(pkg);
+                                  } else {
+                                    handleOpenDetails(pkg);
+                                  }
                                 }}
                                 className="flex-1 py-2.5 px-3 bg-slate-700/90 hover:bg-slate-650 hover:text-white border border-slate-600/90 rounded-xl text-amber-300 font-extrabold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-98 shadow-sm"
                               >
-                                <Eye className="w-4 h-4 text-amber-400" />
-                                <span>বিস্তারিত দেখুন</span>
+                                {isOffer ? (
+                                  <>
+                                    <Flame className="w-4 h-4 fill-amber-400 text-amber-400" />
+                                    <span>অফার দেখুন</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Eye className="w-4 h-4 text-amber-400" />
+                                    <span>বিস্তারিত দেখুন</span>
+                                  </>
+                                )}
                               </button>
 
                               <button
@@ -563,7 +710,7 @@ export const DigitalStoreModal: React.FC<DigitalStoreModalProps> = ({
                                   e.stopPropagation();
                                   handleOpenCheckout(pkg);
                                 }}
-                                className="flex-1 py-2.5 px-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 rounded-xl text-white font-extrabold text-xs shadow-md flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 transition-all"
+                                className="flex-1 py-2.5 px-3 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 rounded-xl text-white font-extrabold text-xs shadow-md flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 transition-all"
                               >
                                 <ShoppingBag className="w-3.5 h-3.5" />
                                 <span>এখনই কিনুন (৳{pkg.priceBdt})</span>
@@ -620,8 +767,78 @@ export const DigitalStoreModal: React.FC<DigitalStoreModalProps> = ({
                   </div>
                 </div>
 
-                {/* Special Offer / Discount Banner if present */}
-                {(selectedDetailPkg.discountBadge || (selectedDetailPkg.originalPriceBdt && selectedDetailPkg.originalPriceBdt > selectedDetailPkg.priceBdt)) && (
+                {/* Special Offer Banner with Live 4-Box Digital Countdown */}
+                {selectedDetailPkg.isSpecialOffer ? (
+                  (() => {
+                    const detailCountdown = getOfferCountdown(selectedDetailPkg);
+                    const origPrice = selectedDetailPkg.originalPriceBdt || Math.round(selectedDetailPkg.priceBdt * 2);
+                    const savings = origPrice > selectedDetailPkg.priceBdt ? origPrice - selectedDetailPkg.priceBdt : 0;
+                    return (
+                      <div className="bg-gradient-to-r from-rose-950/70 via-amber-950/60 to-purple-950/70 border-2 border-amber-500/60 rounded-2xl p-3.5 space-y-3 shadow-lg">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-rose-600 flex items-center justify-center text-white shrink-0 shadow-sm">
+                              <Flame className="w-6 h-6 text-amber-200 fill-amber-200 animate-pulse" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-black text-amber-300">
+                                  {selectedDetailPkg.discountBadge || 'সীমিত সময়ের মেগা অফার!'}
+                                </span>
+                                <span className="text-[10px] text-amber-200 font-bold bg-black/40 px-2 py-0.5 rounded-full border border-amber-500/30">
+                                  {selectedDetailPkg.offerDurationDays || 7} দিনের স্পেশাল অফার
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-300">
+                                নিয়মিত মূল্য <del className="text-slate-400">৳{origPrice}</del> এর বদলে মাত্র ৳{selectedDetailPkg.priceBdt} টাকা!
+                              </p>
+                            </div>
+                          </div>
+
+                          {savings > 0 && (
+                            <div className="text-right shrink-0">
+                              <span className="text-[10px] font-bold text-slate-400 block">মোট সাশ্রয়</span>
+                              <span className="text-xs font-black text-emerald-400">
+                                ৳{savings} টাকা 💰
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 4-Box Digital Live Countdown */}
+                        {detailCountdown && (
+                          <div className="bg-black/60 rounded-xl p-2.5 border border-amber-500/40">
+                            <div className="flex items-center justify-between text-[11px] mb-1.5 text-amber-300 font-bold">
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+                                অফার শেষ হতে বাকি রিয়েল টাইম:
+                              </span>
+                              <span className="text-[10px] text-rose-300 font-mono">লাইভ কাউন্ট</span>
+                            </div>
+                            <div className="grid grid-cols-4 gap-1.5 text-center font-mono">
+                              <div className="bg-slate-900 p-1.5 rounded-lg border border-slate-800">
+                                <span className="font-black text-base text-amber-300 block">{String(detailCountdown.days).padStart(2, '0')}</span>
+                                <span className="text-[9px] text-slate-400 font-sans">দিন</span>
+                              </div>
+                              <div className="bg-slate-900 p-1.5 rounded-lg border border-slate-800">
+                                <span className="font-black text-base text-amber-300 block">{String(detailCountdown.hours).padStart(2, '0')}</span>
+                                <span className="text-[9px] text-slate-400 font-sans">ঘণ্টা</span>
+                              </div>
+                              <div className="bg-slate-900 p-1.5 rounded-lg border border-slate-800">
+                                <span className="font-black text-base text-amber-300 block">{String(detailCountdown.minutes).padStart(2, '0')}</span>
+                                <span className="text-[9px] text-slate-400 font-sans">মিনিট</span>
+                              </div>
+                              <div className="bg-slate-900 p-1.5 rounded-lg border border-slate-800">
+                                <span className="font-black text-base text-rose-400 block animate-pulse">{String(detailCountdown.seconds).padStart(2, '0')}</span>
+                                <span className="text-[9px] text-slate-400 font-sans">সেকেন্ড</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()
+                ) : (selectedDetailPkg.discountBadge || (selectedDetailPkg.originalPriceBdt && selectedDetailPkg.originalPriceBdt > selectedDetailPkg.priceBdt)) ? (
                   <div className="bg-gradient-to-r from-rose-950/60 via-amber-950/50 to-orange-950/60 border border-amber-500/50 rounded-2xl p-3 flex items-center justify-between gap-3 shadow-md">
                     <div className="flex items-center gap-2.5">
                       <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-500 to-amber-500 flex items-center justify-center text-white shrink-0 shadow-sm">
@@ -647,7 +864,7 @@ export const DigitalStoreModal: React.FC<DigitalStoreModalProps> = ({
                       </div>
                     )}
                   </div>
-                )}
+                ) : null}
 
                 {/* Title and Category */}
                 <div>
@@ -1135,6 +1352,211 @@ export const DigitalStoreModal: React.FC<DigitalStoreModalProps> = ({
             )}
           </div>
         </motion.div>
+
+        {/* Dedicated Special Offer Pop-up Modal when User Clicks on a Special Offer Package */}
+        {specialOfferPopupPkg && (
+          <div
+            id="special-offer-popup-modal-backdrop"
+            className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md"
+            onClick={() => setSpecialOfferPopupPkg(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-slate-900 border-2 border-amber-400 rounded-3xl max-w-md w-full overflow-hidden shadow-2xl shadow-amber-500/25 flex flex-col max-h-[92vh] relative"
+            >
+              {/* Vibrant Top Ribbon */}
+              <div className="relative p-4 pb-3.5 bg-gradient-to-r from-amber-600 via-rose-600 to-purple-700 text-white flex items-start justify-between shadow-md">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-11 h-11 rounded-2xl bg-black/30 backdrop-blur-md border border-white/25 flex items-center justify-center text-amber-300 shadow-md">
+                    <Flame className="w-6 h-6 fill-amber-400 text-amber-400 animate-bounce" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] uppercase tracking-wider font-black px-2 py-0.5 rounded-full bg-black/40 border border-white/20 text-amber-200">
+                        সীমিত সময়ের মেগা অফার
+                      </span>
+                      <span className="text-[10px] font-bold text-amber-100">
+                        {specialOfferPopupPkg.offerDurationDays || 7} দিনের ধামাকা ছাড়
+                      </span>
+                    </div>
+                    <h3 className="font-black text-base text-white mt-0.5">
+                      ধামাকা স্পেশাল অফার! 🔥
+                    </h3>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSpecialOfferPopupPkg(null)}
+                  className="w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-all cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Scrollable Modal Body */}
+              <div className="p-4 overflow-y-auto space-y-4 flex-1">
+                {/* Package Card Highlight */}
+                <div className="flex items-start gap-3 bg-slate-950/70 p-3 rounded-2xl border border-slate-800">
+                  <img
+                    src={specialOfferPopupPkg.thumbnail || 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=500&auto=format&fit=crop&q=60'}
+                    alt={specialOfferPopupPkg.title}
+                    className="w-16 h-16 rounded-xl object-cover border border-amber-500/40 shrink-0 shadow-sm"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] uppercase font-bold text-purple-300 bg-purple-950 px-2 py-0.5 rounded border border-purple-800">
+                      {specialOfferPopupPkg.category}
+                    </span>
+                    <h4 className="font-extrabold text-sm text-white mt-1 leading-snug line-clamp-2">
+                      {specialOfferPopupPkg.title}
+                    </h4>
+                  </div>
+                </div>
+
+                {/* Real-time 4-Box Digital Live Countdown */}
+                {(() => {
+                  const popupCountdown = getOfferCountdown(specialOfferPopupPkg);
+                  const origPrice = specialOfferPopupPkg.originalPriceBdt || Math.round(specialOfferPopupPkg.priceBdt * 2);
+                  const savings = origPrice > specialOfferPopupPkg.priceBdt ? origPrice - specialOfferPopupPkg.priceBdt : 0;
+                  const discountPercent = Math.round((savings / origPrice) * 100);
+
+                  return (
+                    <>
+                      <div className="bg-gradient-to-b from-slate-950 to-slate-900 border border-amber-500/50 rounded-2xl p-3.5 shadow-inner">
+                        <div className="flex items-center justify-between text-xs mb-2">
+                          <div className="flex items-center gap-1.5 font-bold text-amber-300">
+                            <Clock className="w-4 h-4 text-amber-400 animate-spin" />
+                            <span>অফার শেষ হতে বাকি লাইভ কাউন্ট:</span>
+                          </div>
+                          <span className="text-[10px] font-bold text-rose-400 bg-rose-950/80 px-2 py-0.5 rounded-full border border-rose-800/40 font-mono">
+                            {specialOfferPopupPkg.offerDurationDays || 7} দিনের মেগা অফার
+                          </span>
+                        </div>
+
+                        {popupCountdown && (
+                          <div className="grid grid-cols-4 gap-2 text-center">
+                            <div className="bg-slate-900/90 border border-amber-500/40 rounded-xl p-2 shadow-xs">
+                              <span className="block font-black text-xl text-amber-300 font-mono">
+                                {String(popupCountdown.days).padStart(2, '0')}
+                              </span>
+                              <span className="text-[10px] font-bold text-slate-400">দিন (Days)</span>
+                            </div>
+                            <div className="bg-slate-900/90 border border-amber-500/40 rounded-xl p-2 shadow-xs">
+                              <span className="block font-black text-xl text-amber-300 font-mono">
+                                {String(popupCountdown.hours).padStart(2, '0')}
+                              </span>
+                              <span className="text-[10px] font-bold text-slate-400">ঘণ্টা (Hours)</span>
+                            </div>
+                            <div className="bg-slate-900/90 border border-amber-500/40 rounded-xl p-2 shadow-xs">
+                              <span className="block font-black text-xl text-amber-300 font-mono">
+                                {String(popupCountdown.minutes).padStart(2, '0')}
+                              </span>
+                              <span className="text-[10px] font-bold text-slate-400">মিনিট (Mins)</span>
+                            </div>
+                            <div className="bg-slate-900/90 border border-amber-500/40 rounded-xl p-2 shadow-xs">
+                              <span className="block font-black text-xl text-rose-400 font-mono animate-pulse">
+                                {String(popupCountdown.seconds).padStart(2, '0')}
+                              </span>
+                              <span className="text-[10px] font-bold text-slate-400">সেকেন্ড (Secs)</span>
+                            </div>
+                          </div>
+                        )}
+
+                        <p className="text-[11px] text-center text-slate-300 mt-2 font-medium">
+                          ⏳ এই বিশেষ অফারটি আর মাত্র <strong className="text-amber-300 font-bold">{popupCountdown?.formattedBn}</strong> সক্রিয় থাকবে!
+                        </p>
+                      </div>
+
+                      {/* Pricing & Massive Discount Breakdown */}
+                      <div className="bg-slate-950/90 border border-amber-500/30 rounded-2xl p-3.5 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-400">নিয়মিত মূল্য (Original Price):</span>
+                          <span className="text-sm line-through text-slate-400 font-bold">
+                            ৳{origPrice} BDT
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-amber-300">অফার মূল্য (Offer Price):</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-2xl font-black text-amber-400">
+                              ৳{specialOfferPopupPkg.priceBdt} BDT
+                            </span>
+                            <span className="text-xs text-slate-400">
+                              (${specialOfferPopupPkg.priceUsd.toFixed(2)} USD)
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
+                          <span className="font-bold text-emerald-400">আপনার নিশ্চিত মোট সাশ্রয়:</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-rose-500 to-amber-500 text-white shadow-xs">
+                              {specialOfferPopupPkg.discountBadge || `${discountPercent}% ছাড় 🔥`}
+                            </span>
+                            <span className="font-black text-emerald-400 text-sm">
+                              ৳{savings} টাকা! 💰
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+
+                {/* Key Features Included */}
+                {specialOfferPopupPkg.features && specialOfferPopupPkg.features.length > 0 && (
+                  <div className="space-y-1.5">
+                    <h5 className="font-extrabold text-xs text-purple-300 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      এই স্পেশাল প্যাকেজে অন্তর্ভুক্ত রয়েছে:
+                    </h5>
+                    <div className="space-y-1.5 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                      {specialOfferPopupPkg.features.map((f, i) => (
+                        <div key={i} className="text-xs text-slate-300 flex items-center gap-2">
+                          <span className="text-emerald-400 font-bold">✓</span>
+                          <span>{f}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons in Popup */}
+              <div className="p-3 bg-slate-950 border-t border-slate-800 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const pkg = specialOfferPopupPkg;
+                    setSpecialOfferPopupPkg(null);
+                    handleOpenDetails(pkg);
+                  }}
+                  className="flex-1 py-3 px-3 bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                >
+                  <Eye className="w-4 h-4 text-amber-400" />
+                  <span>বিস্তারিত দেখুন</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const pkg = specialOfferPopupPkg;
+                    setSpecialOfferPopupPkg(null);
+                    handleOpenCheckout(pkg);
+                  }}
+                  className="flex-1 py-3 px-3 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 text-white rounded-xl font-black text-xs shadow-lg shadow-amber-500/20 flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 transition-all"
+                >
+                  <ShoppingBag className="w-4 h-4" />
+                  <span>অফারে কিনুন (৳{specialOfferPopupPkg.priceBdt})</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </div>
     </AnimatePresence>
   );

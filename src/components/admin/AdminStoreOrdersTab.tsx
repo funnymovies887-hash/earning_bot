@@ -17,6 +17,8 @@ import {
   Search,
   Filter,
   Edit3,
+  Flame,
+  Sparkles,
 } from 'lucide-react';
 import { DigitalPackage, PackageOrder, PaymentNumbersConfig } from '../../types';
 import { AdminFloatingToast, AdminToastData } from './AdminFloatingToast';
@@ -61,6 +63,8 @@ export const AdminStoreOrdersTab: React.FC = () => {
   const [pkgPriceUsd, setPkgPriceUsd] = useState(3.75);
   const [pkgOriginalPriceBdt, setPkgOriginalPriceBdt] = useState<number | ''>('');
   const [pkgDiscountBadge, setPkgDiscountBadge] = useState('');
+  const [pkgIsSpecialOffer, setPkgIsSpecialOffer] = useState(false);
+  const [pkgOfferDurationDays, setPkgOfferDurationDays] = useState(7);
   const [pkgThumbnail, setPkgThumbnail] = useState('https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=500&auto=format&fit=crop&q=60');
   const [pkgDownloadUrl, setPkgDownloadUrl] = useState('https://drive.google.com');
 
@@ -78,6 +82,8 @@ export const AdminStoreOrdersTab: React.FC = () => {
     setPkgPriceUsd(3.75);
     setPkgOriginalPriceBdt('');
     setPkgDiscountBadge('');
+    setPkgIsSpecialOffer(false);
+    setPkgOfferDurationDays(7);
     setPkgThumbnail('https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=500&auto=format&fit=crop&q=60');
     setPkgDownloadUrl('https://drive.google.com');
     setIsPkgSaved(false);
@@ -254,6 +260,8 @@ export const AdminStoreOrdersTab: React.FC = () => {
           priceUsd: Number(pkgPriceUsd),
           originalPriceBdt: pkgOriginalPriceBdt ? Number(pkgOriginalPriceBdt) : undefined,
           discountBadge: pkgDiscountBadge.trim(),
+          isSpecialOffer: pkgIsSpecialOffer,
+          offerDurationDays: Number(pkgOfferDurationDays) || 7,
           thumbnail: pkgThumbnail.trim(),
           downloadUrl: pkgDownloadUrl.trim(),
         }),
@@ -318,6 +326,10 @@ export const AdminStoreOrdersTab: React.FC = () => {
           priceUsd: Number(editingPackage.priceUsd) || 3.75,
           originalPriceBdt: editingPackage.originalPriceBdt ? Number(editingPackage.originalPriceBdt) : undefined,
           discountBadge: (editingPackage.discountBadge || '').trim(),
+          isSpecialOffer: Boolean(editingPackage.isSpecialOffer),
+          offerDurationDays: Number(editingPackage.offerDurationDays) || 7,
+          offerExpiresAt: editingPackage.offerExpiresAt,
+          resetOfferTimer: Boolean((editingPackage as any).resetOfferTimer),
           thumbnail: editingPackage.thumbnail.trim(),
           downloadUrl: editingPackage.downloadUrl.trim(),
           hashtags: editingPackage.hashtags,
@@ -847,12 +859,23 @@ export const AdminStoreOrdersTab: React.FC = () => {
                     className="w-20 h-20 rounded-xl object-cover border border-slate-700 shrink-0"
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800/60 uppercase">
-                        {pkg.category}
-                      </span>
+                    <div className="flex items-center justify-between gap-1 flex-wrap">
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800/60 uppercase">
+                          {pkg.category}
+                        </span>
+                        {pkg.isSpecialOffer && (
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800/60 uppercase flex items-center gap-1">
+                            <Flame className="w-3 h-3 fill-amber-400 text-amber-400" />
+                            অফার ({pkg.offerDurationDays || 7} দিন)
+                          </span>
+                        )}
+                      </div>
                       <span className="text-xs font-bold text-amber-300">
                         ৳{pkg.priceBdt} / ${pkg.priceUsd}
+                        {pkg.originalPriceBdt && pkg.originalPriceBdt > pkg.priceBdt && (
+                          <del className="ml-1 text-[10px] text-slate-500 font-normal">৳{pkg.originalPriceBdt}</del>
+                        )}
                       </span>
                     </div>
 
@@ -1159,34 +1182,118 @@ export const AdminStoreOrdersTab: React.FC = () => {
               </div>
 
               {/* Special Offer & Discount Fields */}
-              <div className="grid grid-cols-2 gap-3 p-2.5 bg-amber-950/20 border border-amber-500/30 rounded-2xl">
-                <div>
-                  <label className="font-bold text-amber-300 block mb-1">🔥 আসল মূল্য (Original BDT):</label>
+              <div className="p-3 bg-gradient-to-r from-amber-950/40 via-slate-900 to-rose-950/40 border border-amber-500/40 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between pb-1.5 border-b border-amber-500/20">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🔥</span>
+                    <label htmlFor="add-pkg-special-offer" className="font-extrabold text-amber-300 text-xs cursor-pointer select-none">
+                      স্পেশাল মেগা অফার সক্রিয় করুন (Special Offer)
+                    </label>
+                  </div>
                   <input
-                    type="number"
-                    step="1"
-                    placeholder="যেমন: 150 (কাটা দাগ দেখাবে)"
-                    value={pkgOriginalPriceBdt}
-                    onChange={(e) => setPkgOriginalPriceBdt(e.target.value ? parseFloat(e.target.value) : '')}
-                    className="w-full bg-slate-950 border border-amber-500/40 rounded-xl p-2 text-xs text-white font-bold focus:outline-none focus:border-amber-400"
+                    id="add-pkg-special-offer"
+                    type="checkbox"
+                    checked={pkgIsSpecialOffer}
+                    onChange={(e) => {
+                      setPkgIsSpecialOffer(e.target.checked);
+                      if (e.target.checked && !pkgOriginalPriceBdt) {
+                        setPkgOriginalPriceBdt(Math.round(pkgPriceBdt * 2));
+                        setPkgDiscountBadge('৫০% ছাড় 🔥');
+                      }
+                    }}
+                    className="w-4 h-4 accent-amber-500 cursor-pointer"
                   />
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">
-                    ইউজার দেখবে: <del>৳{pkgOriginalPriceBdt || 150}</del>
-                  </span>
                 </div>
-                <div>
-                  <label className="font-bold text-amber-300 block mb-1">⚡ অফার / ডিসকাউন্ট ব্যাজ:</label>
-                  <input
-                    type="text"
-                    placeholder="যেমন: ৫০% ছাড় 🔥 বা সীমিত অফার"
-                    value={pkgDiscountBadge}
-                    onChange={(e) => setPkgDiscountBadge(e.target.value)}
-                    className="w-full bg-slate-950 border border-amber-500/40 rounded-xl p-2 text-xs text-amber-200 font-bold focus:outline-none focus:border-amber-400"
-                  />
-                  <span className="text-[10px] text-amber-400 mt-0.5 block">
-                    প্যাকেজে রঙিন আকর্ষণীয় ব্যাজ দেখাবে
-                  </span>
-                </div>
+
+                {pkgIsSpecialOffer && (
+                  <div className="space-y-3 pt-1">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-bold text-amber-300 block mb-1 text-[11px]">
+                          🔥 আসল মূল্য (Original BDT):
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          placeholder="যেমন: 150 (কাটা দাগ দেখাবে)"
+                          value={pkgOriginalPriceBdt}
+                          onChange={(e) => {
+                            const orig = e.target.value ? parseFloat(e.target.value) : '';
+                            setPkgOriginalPriceBdt(orig);
+                            if (orig && Number(orig) > pkgPriceBdt) {
+                              const disc = Math.round(((Number(orig) - pkgPriceBdt) / Number(orig)) * 100);
+                              setPkgDiscountBadge(`${disc}% ছাড় 🔥`);
+                            }
+                          }}
+                          className="w-full bg-slate-950 border border-amber-500/40 rounded-xl p-2 text-xs text-white font-bold focus:outline-none focus:border-amber-400"
+                        />
+                        <span className="text-[10px] text-slate-400 mt-0.5 block">
+                          ইউজার দেখবে: <del>৳{pkgOriginalPriceBdt || 150}</del> এর বদলে ৳{pkgPriceBdt}
+                        </span>
+                      </div>
+                      <div>
+                        <label className="font-bold text-amber-300 block mb-1 text-[11px]">
+                          ⚡ অফার / ডিসকাউন্ট ব্যাজ:
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="যেমন: ৬৭% ছাড় 🔥 বা সীমিত ডিল"
+                          value={pkgDiscountBadge}
+                          onChange={(e) => setPkgDiscountBadge(e.target.value)}
+                          className="w-full bg-slate-950 border border-amber-500/40 rounded-xl p-2 text-xs text-amber-200 font-bold focus:outline-none focus:border-amber-400"
+                        />
+                        <span className="text-[10px] text-amber-400 mt-0.5 block">
+                          প্যাকেজের গায়ে রঙিন আকর্ষণীয় ব্যাজ দেখাবে
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Offer Duration Days with quick presets */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="font-bold text-amber-300 text-[11px]">
+                          ⏰ অফারের মেয়াদ (দিন):
+                        </label>
+                        <span className="text-[10px] text-amber-400 font-bold">
+                          {pkgOfferDurationDays} দিনের রিয়েল কাউন্টডাউন
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="1"
+                          max="365"
+                          value={pkgOfferDurationDays}
+                          onChange={(e) => setPkgOfferDurationDays(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-24 bg-slate-950 border border-amber-500/40 rounded-xl p-2 text-xs text-white font-black text-center focus:outline-none focus:border-amber-400"
+                        />
+                        <span className="text-xs text-slate-300 font-bold">দিন</span>
+                        <div className="flex items-center gap-1.5 flex-wrap ml-auto">
+                          {[3, 7, 15, 30].map((d) => (
+                            <button
+                              key={d}
+                              type="button"
+                              onClick={() => setPkgOfferDurationDays(d)}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-black cursor-pointer transition-all ${
+                                pkgOfferDurationDays === d
+                                  ? 'bg-gradient-to-r from-amber-500 to-rose-600 text-white shadow-xs'
+                                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                              }`}
+                            >
+                              {d} দিন {d === 7 ? '⭐' : ''}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="mt-2 p-2 bg-black/60 rounded-xl border border-amber-500/30 text-[11px] text-emerald-300 flex items-center justify-between">
+                        <span>⏳ ইউজারের লাইভ টাইমার:</span>
+                        <span className="font-mono font-black text-amber-300">
+                          {pkgOfferDurationDays} দিন ০০ ঘণ্টা ০০ মিনিট (প্রতি সেকেন্ড লাইভ কমবে)
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -1397,40 +1504,147 @@ export const AdminStoreOrdersTab: React.FC = () => {
               </div>
 
               {/* Special Offer & Discount Fields for Edit */}
-              <div className="grid grid-cols-2 gap-3 p-2.5 bg-amber-950/20 border border-amber-500/30 rounded-2xl">
-                <div>
-                  <label className="font-bold text-amber-300 block mb-1">🔥 আসল মূল্য (Original BDT):</label>
+              <div className="p-3 bg-gradient-to-r from-amber-950/40 via-slate-900 to-rose-950/40 border border-amber-500/40 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between pb-1.5 border-b border-amber-500/20">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🔥</span>
+                    <label htmlFor="edit-pkg-special-offer" className="font-extrabold text-amber-300 text-xs cursor-pointer select-none">
+                      স্পেশাল মেগা অফার সক্রিয় করুন (Special Offer)
+                    </label>
+                  </div>
                   <input
-                    type="number"
-                    step="1"
-                    placeholder="যেমন: 150 (কাটা দাগ দেখাবে)"
-                    value={editingPackage.originalPriceBdt ?? ''}
-                    onChange={(e) => setEditingPackage({
-                      ...editingPackage,
-                      originalPriceBdt: e.target.value ? parseFloat(e.target.value) : undefined
-                    })}
-                    className="w-full bg-slate-950 border border-amber-500/40 rounded-xl p-2 text-xs text-white font-bold focus:outline-none focus:border-amber-400"
+                    id="edit-pkg-special-offer"
+                    type="checkbox"
+                    checked={Boolean(editingPackage.isSpecialOffer)}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setEditingPackage({
+                        ...editingPackage,
+                        isSpecialOffer: checked,
+                        offerDurationDays: editingPackage.offerDurationDays || 7,
+                        originalPriceBdt: checked && !editingPackage.originalPriceBdt ? Math.round(editingPackage.priceBdt * 2) : editingPackage.originalPriceBdt,
+                        discountBadge: checked && !editingPackage.discountBadge ? '৫০% ছাড় 🔥' : editingPackage.discountBadge,
+                      });
+                    }}
+                    className="w-4 h-4 accent-amber-500 cursor-pointer"
                   />
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">
-                    ইউজার দেখবে: <del>৳{editingPackage.originalPriceBdt || 150}</del>
-                  </span>
                 </div>
-                <div>
-                  <label className="font-bold text-amber-300 block mb-1">⚡ অফার / ডিসকাউন্ট ব্যাজ:</label>
-                  <input
-                    type="text"
-                    placeholder="যেমন: ৫০% ছাড় 🔥 বা সীমিত অফার"
-                    value={editingPackage.discountBadge || ''}
-                    onChange={(e) => setEditingPackage({
-                      ...editingPackage,
-                      discountBadge: e.target.value
-                    })}
-                    className="w-full bg-slate-950 border border-amber-500/40 rounded-xl p-2 text-xs text-amber-200 font-bold focus:outline-none focus:border-amber-400"
-                  />
-                  <span className="text-[10px] text-amber-400 mt-0.5 block">
-                    প্যাকেজে রঙিন আকর্ষণীয় ব্যাজ দেখাবে
-                  </span>
-                </div>
+
+                {editingPackage.isSpecialOffer && (
+                  <div className="space-y-3 pt-1">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-bold text-amber-300 block mb-1 text-[11px]">
+                          🔥 আসল মূল্য (Original BDT):
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          placeholder="যেমন: 150"
+                          value={editingPackage.originalPriceBdt ?? ''}
+                          onChange={(e) => {
+                            const orig = e.target.value ? parseFloat(e.target.value) : undefined;
+                            const badge = orig && orig > editingPackage.priceBdt
+                              ? `${Math.round(((orig - editingPackage.priceBdt) / orig) * 100)}% ছাড় 🔥`
+                              : editingPackage.discountBadge;
+                            setEditingPackage({
+                              ...editingPackage,
+                              originalPriceBdt: orig,
+                              discountBadge: badge,
+                            });
+                          }}
+                          className="w-full bg-slate-950 border border-amber-500/40 rounded-xl p-2 text-xs text-white font-bold focus:outline-none focus:border-amber-400"
+                        />
+                        <span className="text-[10px] text-slate-400 mt-0.5 block">
+                          ইউজার দেখবে: <del>৳{editingPackage.originalPriceBdt || 150}</del> এর বদলে ৳{editingPackage.priceBdt}
+                        </span>
+                      </div>
+                      <div>
+                        <label className="font-bold text-amber-300 block mb-1 text-[11px]">
+                          ⚡ অফার ব্যাজ (Discount Badge):
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="যেমন: ৬৭% ছাড় 🔥 বা ঈদ অফার"
+                          value={editingPackage.discountBadge || ''}
+                          onChange={(e) => setEditingPackage({
+                            ...editingPackage,
+                            discountBadge: e.target.value
+                          })}
+                          className="w-full bg-slate-950 border border-amber-500/40 rounded-xl p-2 text-xs text-amber-200 font-bold focus:outline-none focus:border-amber-400"
+                        />
+                        <span className="text-[10px] text-amber-400 mt-0.5 block">
+                          প্যাকেজের গায়ে রঙিন আকর্ষণীয় ব্যাজ দেখাবে
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Offer Duration Days */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="font-bold text-amber-300 text-[11px]">
+                          ⏰ অফারের মেয়াদ (দিন):
+                        </label>
+                        <span className="text-[10px] text-amber-400 font-bold">
+                          {editingPackage.offerDurationDays || 7} দিনের রিয়েল কাউন্টডাউন
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="1"
+                          max="365"
+                          value={editingPackage.offerDurationDays || 7}
+                          onChange={(e) => setEditingPackage({
+                            ...editingPackage,
+                            offerDurationDays: Math.max(1, parseInt(e.target.value) || 1),
+                          })}
+                          className="w-24 bg-slate-950 border border-amber-500/40 rounded-xl p-2 text-xs text-white font-black text-center focus:outline-none focus:border-amber-400"
+                        />
+                        <span className="text-xs text-slate-300 font-bold">দিন</span>
+                        <div className="flex items-center gap-1.5 flex-wrap ml-auto">
+                          {[3, 7, 15, 30].map((d) => (
+                            <button
+                              key={d}
+                              type="button"
+                              onClick={() => setEditingPackage({
+                                ...editingPackage,
+                                offerDurationDays: d,
+                              })}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-black cursor-pointer transition-all ${
+                                (editingPackage.offerDurationDays || 7) === d
+                                  ? 'bg-gradient-to-r from-amber-500 to-rose-600 text-white shadow-xs'
+                                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                              }`}
+                            >
+                              {d} দিন {d === 7 ? '⭐' : ''}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Reset timer option */}
+                      <div className="mt-2 p-2.5 bg-black/60 rounded-xl border border-amber-500/30 flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-emerald-300">
+                          ⏳ লাইভ টাইমার চালু ({editingPackage.offerDurationDays || 7} দিন)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingPackage({
+                              ...editingPackage,
+                              offerExpiresAt: Date.now() + (editingPackage.offerDurationDays || 7) * 24 * 60 * 60 * 1000,
+                              resetOfferTimer: true,
+                            } as any);
+                          }}
+                          className="text-[10px] bg-amber-500/20 hover:bg-amber-500/40 border border-amber-400/50 text-amber-300 px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all"
+                        >
+                          🔄 নতুন করে শুরু করুন
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>

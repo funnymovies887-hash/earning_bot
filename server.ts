@@ -3859,23 +3859,43 @@ async function startServer() {
     // Hide secret downloadUrl from public catalog; only provided upon purchase approval!
     const catalog = serverPackages
       .filter((p) => p.isActive)
-      .map((p) => ({
-        id: p.id,
-        title: p.title,
-        category: p.category,
-        description: p.description,
-        features: p.features,
-        priceBdt: p.priceBdt,
-        priceUsd: p.priceUsd,
-        thumbnail: p.thumbnail,
-        hashtags: p.hashtags || [],
-        fileSize: p.fileSize || "45 MB",
-        version: p.version || "v1.0",
-        requirements: p.requirements || "",
-        previewUrl: p.previewUrl || "",
-        salesCount: p.salesCount || 0,
-        isActive: p.isActive,
-      }));
+      .map((p) => {
+        const isOffer = Boolean(
+          p.isSpecialOffer ??
+          (p.discountBadge || (p.originalPriceBdt && Number(p.originalPriceBdt) > Number(p.priceBdt)))
+        );
+        const durationDays = Number(p.offerDurationDays) || 7;
+        let expiresAt = p.offerExpiresAt ? Number(p.offerExpiresAt) : undefined;
+        if (isOffer && (!expiresAt || isNaN(expiresAt))) {
+          expiresAt = Date.now() + durationDays * 24 * 60 * 60 * 1000;
+          p.offerExpiresAt = expiresAt;
+          p.isSpecialOffer = true;
+          p.offerDurationDays = durationDays;
+        }
+        return {
+          id: p.id,
+          title: p.title,
+          category: p.category,
+          description: p.description,
+          features: p.features || [],
+          priceBdt: p.priceBdt,
+          priceUsd: p.priceUsd,
+          originalPriceBdt: p.originalPriceBdt ? Number(p.originalPriceBdt) : undefined,
+          discountBadge: p.discountBadge || (p.originalPriceBdt && p.originalPriceBdt > p.priceBdt ? `${Math.round(((p.originalPriceBdt - p.priceBdt) / p.originalPriceBdt) * 100)}% ছাড় 🔥` : undefined),
+          isSpecialOffer: isOffer,
+          offerDurationDays: durationDays,
+          offerExpiresAt: expiresAt,
+          offerStartDate: p.offerStartDate,
+          thumbnail: p.thumbnail,
+          hashtags: p.hashtags || [],
+          fileSize: p.fileSize || "45 MB",
+          version: p.version || "v4.2 Pro",
+          requirements: p.requirements || "মোবাইল ও কম্পিউটার সাপোর্টেড",
+          previewUrl: p.previewUrl || "",
+          salesCount: p.salesCount || 0,
+          isActive: p.isActive,
+        };
+      });
     res.json(catalog);
   });
 
@@ -3961,6 +3981,12 @@ async function startServer() {
         .map((h: string) => (h.startsWith('#') ? h : `#${h}`));
     }
 
+    const isSpecialOffer = Boolean(req.body.isSpecialOffer ?? (req.body.discountBadge || (req.body.originalPriceBdt && Number(req.body.originalPriceBdt) > Number(req.body.priceBdt))));
+    const offerDurationDays = Number(req.body.offerDurationDays) || 7;
+    const offerExpiresAt = req.body.offerExpiresAt 
+      ? Number(req.body.offerExpiresAt) 
+      : (isSpecialOffer ? Date.now() + offerDurationDays * 24 * 60 * 60 * 1000 : undefined);
+
     const newPkg = {
       id: "pkg-" + Date.now(),
       title: req.body.title || "New Digital Package",
@@ -3975,7 +4001,10 @@ async function startServer() {
       priceUsd: Number(req.body.priceUsd) || 3.75,
       originalPriceBdt: req.body.originalPriceBdt ? Number(req.body.originalPriceBdt) : undefined,
       discountBadge: (req.body.discountBadge || "").trim() || undefined,
-      isSpecialOffer: Boolean(req.body.isSpecialOffer || req.body.discountBadge || (req.body.originalPriceBdt && Number(req.body.originalPriceBdt) > Number(req.body.priceBdt))),
+      isSpecialOffer,
+      offerDurationDays: isSpecialOffer ? offerDurationDays : undefined,
+      offerExpiresAt: isSpecialOffer ? offerExpiresAt : undefined,
+      offerStartDate: isSpecialOffer ? (req.body.offerStartDate || new Date().toISOString()) : undefined,
       thumbnail: req.body.thumbnail || "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=500&auto=format&fit=crop&q=60",
       downloadUrl: req.body.downloadUrl || "https://drive.google.com",
       hashtags: hashtags.length > 0 ? hashtags : ['#Software', '#DigitalStore', '#VIP'],
@@ -4017,6 +4046,22 @@ async function startServer() {
     }
     if (updates.features && typeof updates.features === 'string') {
       updates.features = updates.features.split('\n').filter((f: string) => f.trim().length > 0);
+    }
+
+    // Handle special offer countdown fields
+    if (updates.isSpecialOffer !== undefined) {
+      if (updates.isSpecialOffer) {
+        const durDays = Number(updates.offerDurationDays) || 7;
+        updates.offerDurationDays = durDays;
+        const prevDuration = serverPackages[idx].offerDurationDays;
+        if (!updates.offerExpiresAt || updates.resetOfferTimer || Number(updates.offerExpiresAt) < Date.now() || (prevDuration && durDays !== prevDuration)) {
+          updates.offerExpiresAt = Date.now() + durDays * 24 * 60 * 60 * 1000;
+          updates.offerStartDate = new Date().toISOString();
+        }
+      } else {
+        updates.isSpecialOffer = false;
+        updates.offerExpiresAt = undefined;
+      }
     }
 
     serverPackages[idx] = { ...serverPackages[idx], ...updates };
@@ -4087,7 +4132,21 @@ async function startServer() {
     }
     saveJsonFile("deleted_package_ids.json", deletedPackageIds);
 
-    serverPackages = incomingPackages;
+    serverPackages = incomingPackages.map((incoming: any) => {
+      if (incoming.isSpecialOffer) {
+        const durDays = Number(incoming.offerDurationDays) || 7;
+        const exp = incoming.offerExpiresAt && Number(incoming.offerExpiresAt) > Date.now()
+          ? Number(incoming.offerExpiresAt)
+          : Date.now() + durDays * 24 * 60 * 60 * 1000;
+        return {
+          ...incoming,
+          isSpecialOffer: true,
+          offerDurationDays: durDays,
+          offerExpiresAt: exp,
+        };
+      }
+      return incoming;
+    });
     saveJsonFile("packages.json", serverPackages);
 
     let githubPushed = false;
